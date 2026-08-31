@@ -8,7 +8,8 @@ classes/
 run/
 
 # Working notes and the port journal — same convention as the 1.12.2 project:
-# everything that is for us rather than for whoever installs the mod.
+# everything that is for us rather than for whoever installs the mod. The
+# handover brief lives here too and is sent to whoever needs it by hand.
 docs/
 хлам/
 

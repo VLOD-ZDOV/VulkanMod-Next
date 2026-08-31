@@ -52,6 +52,13 @@ minecraft {
             // instrument that speaks when a driver would rather carry on: a
             // frame that draws nothing and reports no error is exactly what it
             // exists for.
+            // -Pbudget=<MiB> caps the chunk geometry buffer. Useful when
+            // something else on the machine has the card: the renderer asks for
+            // a quarter of it by default, and a quarter of a card that is
+            // already full is a refusal.
+            if (project.hasProperty('budget')) {
+                jvmArgs '-Dvulkanmodnext.geometryBudget=' + project.property('budget')
+            }
             if (project.hasProperty('validation')) {
                 jvmArgs '-Dvulkanmodnext.validation=true'
             }
@@ -69,6 +76,12 @@ minecraft {
             mods { "${mod_id}" { source sourceSets.main } }
         }
     }
+}
+
+configurations {
+    // Put inside the jar rather than merely on the compile path. Declared above
+    // the dependencies block that uses it, because this file is read in order.
+    bundled
 }
 
 repositories {
@@ -96,6 +109,7 @@ dependencies {
     // with 3.3 bindings is the one way to get this wrong, and it fails at run
     // time rather than at compile time.
     minecraftLibrary 'org.lwjgl:lwjgl-vulkan:3.2.2'
+    bundled 'org.lwjgl:lwjgl-vulkan:3.2.2'
 
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
@@ -142,12 +156,37 @@ tasks.named('processResources', ProcessResources).configure {
 }
 
 tasks.named('jar', Jar).configure {
+    // The Vulkan bindings travel in the jar.
+    //
+    // Minecraft ships LWJGL's core, GLFW, OpenGL, STB and OpenAL, and not this:
+    // it has no use for Vulkan. In the development client that goes unnoticed,
+    // because Gradle puts every declared dependency on the class path — the jar
+    // built from it had none of these classes in it at all, and would have died
+    // on the first Vulkan call in anybody's instance.
+    //
+    // They are pure Java with no natives of their own: the loader they bind to
+    // is the system's libvulkan, found at run time. Two and a half megabytes,
+    // and no way around it on this version — Forge's jarJar, which would keep
+    // them as a nested library instead, arrived later.
+    from({ configurations.bundled.collect { zipTree(it) } }) {
+        // A signature that describes somebody else's jar, and a module
+        // declaration that means nothing inside ours.
+        exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'module-info.class'
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
     manifest {
         attributes([
+                // Without this the mixins are never loaded. In the development
+                // client they are, because MixinGradle puts the config on the
+                // command line there — so the jar looks fine, starts fine, and
+                // does nothing at all, which is the failure this project has
+                // shipped once already.
+                'MixinConfigs'            : "${mod_id}.mixins.json",
                 'Specification-Title'     : mod_id,
                 'Specification-Vendor'    : mod_authors,
                 'Specification-Version'   : '1',
-                'Implementation-Title'    : project.name,
+                'Implementation-Title'    : mod_name,
                 'Implementation-Version'  : project.jar.archiveVersion,
                 'Implementation-Vendor'   : mod_authors,
         ])
