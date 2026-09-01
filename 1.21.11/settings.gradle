@@ -1,0 +1,29 @@
+plugins {
+    // Nobody on this project has a JDK 21 installed by hand. The game needs
+    // exactly that one, so Gradle fetches it rather than failing with advice.
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+
+// Everything this build produces lives outside the repository, and it has to be
+// decided here rather than in build.gradle.
+//
+// Why outside: Forge's mod scanner turns every classpath entry into a URL and
+// back with Path.of(URI), and that round trip does not survive a non-ASCII
+// directory name. This repository lives under a Cyrillic path, so the game dies
+// before it starts with "IllegalArgumentException: Bad escape", from inside
+// ClasspathLocator, naming nothing. A symlink does not help: Gradle resolves it
+// before the classpath is built.
+//
+// Why here: ForgeGradle reads the output directories when it is applied, which
+// is the first line of build.gradle. Moving the build directory after that
+// leaves the compiled classes in the old place and the resources in the new
+// one — the game then starts, finds mods.toml, and reports every one of this
+// mod's mixins as "not found". beforeProject runs before any build script.
+//
+// Override with -PoutDir=<path>.
+gradle.beforeProject { project ->
+    project.layout.buildDirectory = project.file(project.findProperty('outDir')
+            ?: (System.getProperty('user.home') + '/.cache/vulkanmodnext/1.21.11'))
+}
+
+rootProject.name = 'vulkanmodnext-1.21.11'

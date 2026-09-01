@@ -1,0 +1,9 @@
+# The build lives outside the repository on this version — see settings.gradle —
+# but keep these in case somebody points -PoutDir back in here.
+build/
+run/
+.gradle/
+tools/__pycache__/
+
+# Working notes and the port diary, same as the other builds.
+docs/

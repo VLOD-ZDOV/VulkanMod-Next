@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "package": "net.vulkanmodnext.mixin",
+  "plugin": "net.vulkanmodnext.EarlySetup",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8.7",
+  "client": [
+    "ChunkSectionsToRenderMixin",
+    "LevelRendererAccess",
+    "LevelRendererMixin",
+    "SectionMeshMixin",
+    "StartupMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
