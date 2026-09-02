@@ -73,6 +73,29 @@ minecraft {
             if (project.hasProperty('world')) {
                 property 'vulkanmodnext.world', project.property('world')
             }
+            // -Pflight=<hover|spin|line> flies the client by itself: it makes a
+            // world from a fixed seed, waits for the chunks to settle, flies
+            // the route, keeps frames along it and quits. Until this existed
+            // there was no way to measure anything on this version at all.
+            //
+            // Everything the route can be told, without touching this file:
+            // -PflightTag, -PflightSeed, -PflightDistance, -PflightSeconds,
+            // -PflightSettle, -PflightShots, -PflightPatience, -PflightPos,
+            // -PflightProfiler, -PflightPreset, -PflightHour, -PflightWeather,
+            // -PflightPairs, -PflightClouds, -PflightPitch, -PflightWindow and
+            // -PflightYaw and -PflightFramerate.
+            if (project.hasProperty('flight')) {
+                jvmArgs '-Dvulkanmodnext.flight=' + project.property('flight')
+                ['flightTag', 'flightSeed', 'flightDistance', 'flightSeconds',
+                 'flightSettle', 'flightShots', 'flightPatience', 'flightPos',
+                 'flightProfiler', 'flightPreset', 'flightHour', 'flightWeather',
+                 'flightPairs', 'flightClouds', 'flightPitch', 'flightWindow',
+                 'flightYaw', 'flightFramerate'].each { name ->
+                    if (project.hasProperty(name)) {
+                        jvmArgs '-Dvulkanmodnext.' + name + '=' + project.property(name)
+                    }
+                }
+            }
             mods { "${mod_id}" { source sourceSets.main } }
         }
     }
