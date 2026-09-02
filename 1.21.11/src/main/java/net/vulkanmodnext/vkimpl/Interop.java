@@ -108,6 +108,30 @@ final class Interop {
     }
 
     /** Both GL_DEVICE_UUID_EXT and VkPhysicalDeviceIDProperties::deviceUUID are 16 bytes. */
+    /**
+     * Whether the calling thread has an OpenGL context.
+     *
+     * <h2>Why anything asks</h2>
+     *
+     * The JVM shutdown hook has no context, and a GL call from a thread without
+     * one does not throw — LWJGL finds a null function pointer and calls
+     * {@code EXIT}: <em>"FATAL ERROR in native method ... The JVM will abort
+     * execution."</em> The game is then killed rather than closed, and it takes
+     * the exit code with it. It is the last line of every session's log, which
+     * is exactly where nobody looks.
+     *
+     * <p>Everything that gives OpenGL objects back has to ask first, because
+     * teardown is the one path that runs on that thread.
+     */
+    static boolean contextCurrent() {
+        try {
+            GL.getCapabilities();
+            return true;
+        } catch (IllegalStateException noContext) {
+            return false;
+        }
+    }
+
     private static final int UUID_BYTES = 16;
 
     /** Windows GENERIC_ALL: every right the importing side could want. */

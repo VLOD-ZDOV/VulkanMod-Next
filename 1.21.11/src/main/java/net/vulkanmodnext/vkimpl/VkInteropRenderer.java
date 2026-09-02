@@ -547,20 +547,37 @@ final class VkInteropRenderer {
         // The GL side first: it is built on top of the Vulkan memory, and
         // handing that memory back while a texture still names it is the shape
         // of the two crashes this project has already had.
-        if (glTexture > 0) {
+        //
+        // Asked for rather than attempted, and this was measured the hard way:
+        // this method also runs from the JVM shutdown hook, where there is no
+        // GL context, and a GL call from there aborts the whole JVM instead of
+        // throwing. Every clean exit ended with "FATAL ERROR in native method"
+        // and a non-zero exit code — which turns an automated run that
+        // succeeded into a run that reports failure.
+        //
+        // The names are dropped either way. Without a context they belong to a
+        // context that is already gone, and the driver freed them with it.
+        boolean gl = Interop.contextCurrent();
+        if (glTexture > 0 && gl) {
             GL11C.glDeleteTextures(glTexture);
         }
         glTexture = -1;
         if (glMemoryObject != 0) {
-            EXTMemoryObject.glDeleteMemoryObjectsEXT(new int[] {glMemoryObject});
+            if (gl) {
+                EXTMemoryObject.glDeleteMemoryObjectsEXT(new int[] {glMemoryObject});
+            }
             glMemoryObject = 0;
         }
         if (glWaitSemaphore != 0) {
-            EXTSemaphore.glDeleteSemaphoresEXT(new int[] {glWaitSemaphore});
+            if (gl) {
+                EXTSemaphore.glDeleteSemaphoresEXT(new int[] {glWaitSemaphore});
+            }
             glWaitSemaphore = 0;
         }
         if (glSignalSemaphore != 0) {
-            EXTSemaphore.glDeleteSemaphoresEXT(new int[] {glSignalSemaphore});
+            if (gl) {
+                EXTSemaphore.glDeleteSemaphoresEXT(new int[] {glSignalSemaphore});
+            }
             glSignalSemaphore = 0;
         }
         VkDevice device = device();
