@@ -19,6 +19,13 @@ public final class ClientTicks {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
+        // First, and it takes the whole run when it is asked for: the flight
+        // makes its own world, so leaving the development world to also open one
+        // would race it for the same client.
+        if (Flight.asked()) {
+            Flight.tick();
+            return;
+        }
         if (Minecraft.getInstance().screen != null || Minecraft.getInstance().level == null) {
             DevWorld.openIfAsked();
             return;

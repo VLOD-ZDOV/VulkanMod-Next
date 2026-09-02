@@ -8,6 +8,7 @@
   "client": [
     "BufferBuilderAccess",
     "ChunkBufferLayerMixin",
+    "FrameEndMixin",
     "ChunkUploadMixin",
     "ChunkRenderAccess",
     "LightTextureAccess",
