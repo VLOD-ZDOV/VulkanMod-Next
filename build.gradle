@@ -58,16 +58,32 @@ base {
 // seventy-two files, by the time anybody noticed. The one you want is in there
 // and so is every one you do not, which is the same as not having it.
 tasks.register('clearStaleJars') {
-    description 'Deletes jars in build/libs that are not this version.'
+    description 'Moves jars in build/libs that are not this version into libs/previous.'
     doLast {
+        // Moved, never deleted, and that distinction was bought the hard way:
+        // the first version of this task deleted them, and the first thing it
+        // ate was the released 0.10.0-alpha.3 jar. build/libs is a build
+        // directory, but it is also where a release is picked up from, and a
+        // task that quietly destroys the previous release to keep a folder tidy
+        // is a bad trade at any price.
+        //
+        // What it is actually for stays solved: after this runs, build/libs
+        // holds this version and nothing else, so nobody uploads a stale jar
+        // believing it is the current one.
         def keep = propertyString('mod_version')
         def libs = layout.buildDirectory.dir('libs').get().asFile
         if (!libs.isDirectory()) {
             return
         }
+        def previous = new File(libs, 'previous')
         libs.listFiles()?.each { file ->
-            if (file.name.endsWith('.jar') && !file.name.contains(keep)) {
-                file.delete()
+            if (file.isFile() && file.name.endsWith('.jar') && !file.name.contains(keep)) {
+                previous.mkdirs()
+                def target = new File(previous, file.name)
+                target.delete()
+                if (!file.renameTo(target)) {
+                    logger.warn("Could not move the stale jar ${file.name} aside; leaving it.")
+                }
             }
         }
     }
