@@ -10673,12 +10673,7 @@ final class VkTerrainRenderer {
      * JVM shutdown hook has none — GL calls there abort the whole JVM.
      */
     private static boolean glContextCurrent() {
-        try {
-            org.lwjgl.opengl.GL.getCapabilities();
-            return true;
-        } catch (IllegalStateException e) {
-            return false;
-        }
+        return Interop.contextCurrent();
     }
 
     private void destroyTargets() {
