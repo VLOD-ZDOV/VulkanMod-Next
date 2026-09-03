@@ -262,6 +262,11 @@ public final class VulkanConfig {
         for (Settings.Setting setting : Settings.all()) {
             VALUES.put(setting.key, setting.fallback);
         }
+        // Same reason as in set(): a value that only reaches this map is a
+        // value the picture never sees. Written out separately rather than by
+        // calling set() in the loop, so the renderer is told once instead of a
+        // hundred and six times.
+        publish();
     }
 
     /**
