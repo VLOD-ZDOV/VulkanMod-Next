@@ -62,6 +62,20 @@ minecraft {
             if (project.hasProperty('validation')) {
                 jvmArgs '-Dvulkanmodnext.validation=true'
             }
+            // -Pset=leafGlow=80,waterWaves=100 gives any setting a value for
+            // this run and this run only. The config file is not touched, and
+            // a launcher flag outranks it — which is the whole point: turning
+            // an effect to both ends and comparing the two frames is how an
+            // effect is shown to work, and doing that by editing somebody's
+            // settings would be a test that changes what it measures.
+            if (project.hasProperty('set')) {
+                project.property('set').toString().split(',').each { pair ->
+                    def bits = pair.split('=', 2)
+                    if (bits.length == 2 && bits[0].trim()) {
+                        jvmArgs '-Dvulkanmodnext.' + bits[0].trim() + '=' + bits[1].trim()
+                    }
+                }
+            }
             if (project.hasProperty('compact')) {
                 jvmArgs '-Dvulkanmodnext.compactVertices=' +
                         (project.property('compact') == 'off' ? 'false' : 'true')
