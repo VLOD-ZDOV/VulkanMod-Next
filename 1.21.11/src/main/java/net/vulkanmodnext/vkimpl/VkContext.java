@@ -1042,7 +1042,9 @@ public final class VkContext {
             interopRenderer = null;
         }
         if (device != null) {
-            vkDeviceWaitIdle(device);
+            if (!VkTerrainRenderer.cardStoppedAnswering) {
+                vkDeviceWaitIdle(device);
+            }
             vkDestroyDevice(device, null);
             device = null;
         }

@@ -1385,17 +1385,23 @@ public final class VulkanContextImpl implements VulkanBridge {
             terrainRenderer = null;
         }
         if (chunkMirror != null) {
-            vkDeviceWaitIdle(device);
+            if (!VkTerrainRenderer.cardStoppedAnswering) {
+                vkDeviceWaitIdle(device);
+            }
             chunkMirror.destroyAll();
             chunkMirror = null;
         }
         if (interopRenderer != null) {
-            vkDeviceWaitIdle(device);
+            if (!VkTerrainRenderer.cardStoppedAnswering) {
+                vkDeviceWaitIdle(device);
+            }
             interopRenderer.destroy();
             interopRenderer = null;
         }
         if (demoRenderer != null) {
-            vkDeviceWaitIdle(device);
+            if (!VkTerrainRenderer.cardStoppedAnswering) {
+                vkDeviceWaitIdle(device);
+            }
             demoRenderer.destroy();
             demoRenderer = null;
         }
@@ -1412,7 +1418,9 @@ public final class VulkanContextImpl implements VulkanBridge {
             debugCallback = null;
         }
         if (device != null) {
-            vkDeviceWaitIdle(device);
+            if (!VkTerrainRenderer.cardStoppedAnswering) {
+                vkDeviceWaitIdle(device);
+            }
             vkDestroyDevice(device, null);
             device = null;
         }
