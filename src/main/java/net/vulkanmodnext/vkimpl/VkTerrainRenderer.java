@@ -3179,7 +3179,7 @@ final class VkTerrainRenderer {
      * answer.
      */
     synchronized boolean drawsTranslucent() {
-        return translucentFramebuffer != 0 && canReturnDepth();
+        return !translucentLost && translucentFramebuffer != 0 && canReturnDepth();
     }
 
     /**
@@ -3812,13 +3812,42 @@ final class VkTerrainRenderer {
      */
     private long sharedDepthFrames;
 
+    /**
+     * How long this pass will wait for the card before deciding it is not
+     * coming back.
+     *
+     * The pass takes seventy microseconds of card time. Two seconds is thirty
+     * thousand times that, so nothing this catches is a slow frame — it is a
+     * dead one.
+     */
+    private static final long TRANSLUCENT_FENCE_TIMEOUT_NANOS = 2_000_000_000L;
+
+    /**
+     * Set when the card stopped answering for this pass, and never cleared.
+     *
+     * Every other wait in this renderer is bounded; this one was not, and what
+     * that cost was measured on a flight that never finished. The card raised a
+     * class error on our command stream, the channel died, the fence it was
+     * going to signal never was, and the render thread sat inside
+     * vkWaitForFences for twelve minutes at no processor cost at all — no
+     * message, no crash, no black screen, nothing to report but a window that
+     * had stopped moving. The wait a few hundred lines above this one already
+     * carries the argument in its own comment: an unbounded wait looks exactly
+     * like the hang it is meant to explain.
+     *
+     * Once it is set the layer goes back to the game, which draws its own
+     * water. That is a worse picture than ours and an incomparably better one
+     * than none, and it leaves a running game to report from.
+     */
+    private boolean translucentLost;
+
     private boolean renderTranslucent(int[] chunks, int chunkCount, float[] mvp,
                                       double viewX, double viewY, double viewZ,
                                       VkChunkMirror mirror) {
         // Sprites are drawn in this pass, so a frame with particles and no
         // water still needs it. Without that second term, standing in a desert
         // and breaking a block put the particles nowhere at all.
-        if (translucentFramebuffer == 0 || !canReturnDepth()
+        if (translucentLost || translucentFramebuffer == 0 || !canReturnDepth()
                 || (chunkCount == 0 && spriteBatchCount == 0)) {
             // With no way to get the game's depth back, drawing the layer
             // would be worse than leaving it where it is.
@@ -3840,9 +3869,25 @@ final class VkTerrainRenderer {
             // nothing to find, and the alternative was written off in the notes
             // as excluded without ever being measured.
             long waitStart = System.nanoTime();
-            check(vkWaitForFences(device(), translucentFences[slot], true, Long.MAX_VALUE),
-                    "vkWaitForFences(translucent)");
-            translucentWaitNanos += System.nanoTime() - waitStart;
+            int waited = vkWaitForFences(device(), translucentFences[slot], true,
+                    TRANSLUCENT_FENCE_TIMEOUT_NANOS);
+            long waitNanos = System.nanoTime() - waitStart;
+            if (waited != VK_SUCCESS) {
+                // Not folded into the timing counter, and that is deliberate:
+                // two seconds averaged into a column that reads in hundredths
+                // of a millisecond would bury the one frame worth looking at
+                // under the six hundred that were fine.
+                translucentLost = true;
+                LOGGER.error("The card never finished the translucent pass: "
+                        + "vkWaitForFences returned {} after {} ms, fence status {}. "
+                        + "Handing this layer back to the game for the rest of the "
+                        + "session. Check the system log for a driver message from "
+                        + "this process around now.",
+                        waited, waitNanos / 1_000_000L,
+                        vkGetFenceStatus(device(), translucentFences[slot]));
+                return false;
+            }
+            translucentWaitNanos += waitNanos;
             check(vkResetFences(device(), translucentFences[slot]), "vkResetFences(translucent)");
 
             // Both the buffer this writes and the index buffer it may resize
