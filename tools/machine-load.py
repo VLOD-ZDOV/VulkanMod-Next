@@ -24,16 +24,19 @@ Usage
 
     python3 tools/machine-load.py --until java --out load.csv
     python3 tools/machine-load.py --report load.csv --from 16:50:14 --to 16:50:34
+    python3 tools/machine-load.py --report load.csv --log run/logs/latest.log --tag vk-a
 
 The first form follows a process until it exits. The second reads a recording
 back and summarises one slice of it — hand it the two timestamps that the
 flight's own log lines carry, so the slice is the route and not the loading
-screen.
+screen. The third finds those two timestamps itself, in the game's log, which
+is the same thing done without a chance to mistype either of them.
 """
 
 import argparse
 import collections
 import os
+import re
 import subprocess
 import sys
 import time
@@ -229,6 +232,31 @@ def follow(pattern, out_path, interval, limit):
     return rows, ours is not None
 
 
+def flight_window(log_path, tag):
+    """The wall clock at which a flight began and ended, from the game's log.
+
+    Both lines are the flight's own, and the window between them is the route:
+    before the first one the world is still settling, which is not what any of
+    this is trying to describe.
+    """
+    start = end = rate = None
+    begins = "Flight %s route" % tag
+    ends = "Flight %s frame rate" % tag
+    with open(log_path, errors="replace") as handle:
+        for line in handle:
+            stamp = re.match(r"\[\S+ (\d\d:\d\d:\d\d)", line)
+            if not stamp:
+                continue
+            if begins in line:
+                start = stamp.group(1)
+            elif ends in line:
+                end = stamp.group(1)
+                found = re.search(r"median (\d+), 5% low (\d+)", line)
+                if found:
+                    rate = (int(found.group(1)), int(found.group(2)))
+    return start, end, rate
+
+
 def parse(path):
     rows = []
     with open(path) as handle:
@@ -366,9 +394,21 @@ def main():
                         help="summarise a recording instead of making one")
     parser.add_argument("--from", dest="start", metavar="HH:MM:SS")
     parser.add_argument("--to", dest="end", metavar="HH:MM:SS")
+    parser.add_argument("--log", metavar="LATEST.LOG",
+                        help="take the window from a flight's own log lines")
+    parser.add_argument("--tag", help="which flight in that log, its -PflightTag")
     args = parser.parse_args()
 
     if args.report:
+        if args.log:
+            if not args.tag:
+                sys.exit("--log needs --tag, the same one the flight was given.")
+            args.start, args.end, rate = flight_window(args.log, args.tag)
+            if not args.start or not args.end:
+                sys.exit("No complete flight tagged %r in %s — it may not have "
+                         "finished." % (args.tag, args.log))
+            if rate:
+                print("flight %s: median %d, 5%% low %d" % (args.tag, rate[0], rate[1]))
         report(args.report, args.start, args.end)
         return
     if not args.until:
