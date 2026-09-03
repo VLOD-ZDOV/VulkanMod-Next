@@ -222,7 +222,7 @@ public final class Settings {
                 "How much light gathers into moving bands on the bed of shallow water. Real ");
         add("waterReflection", Category.GENERAL, false, 0, 100, 0, false,
                 "How much of a water surface turns into a reflection of the sky as you look ");
-        add("waterRefraction", Category.GENERAL, false, 0, 100, 0, false,
+        add("waterRefraction", Category.GENERAL, false, 0, 100, 0, true,
                 "How much the surface of water bends what is seen through it. Reflection and ");
         add("waterWaves", Category.GENERAL, false, 0, 100, 0, false,
                 "How much a moving wave pattern tilts the water surface, in percent. 0 is off. ");
