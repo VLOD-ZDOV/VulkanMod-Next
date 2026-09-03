@@ -17,6 +17,14 @@
   not notice the first release under the new name. From this version on both
   names are recognised, so the next rename will not do it again.
 
+- **Fixed: the game could die on the way out.** Closing the game ended with
+  `FATAL ERROR in native method ... The JVM will abort execution` instead of a
+  clean exit. The mod was handing OpenGL objects back from the JVM's shutdown
+  hook, where there is no OpenGL context left to hand them to — and a call like
+  that does not fail, it kills the process. Nothing was lost when it happened
+  (the world is already saved by then), but the game reported a crash where
+  there was none.
+
 - **The jar says which Minecraft it is for.** `vulkanmodnext-1.12.2-0.10.0-alpha.4.jar`
   rather than `vulkanmodnext-0.10.0-alpha.4.jar`. With two builds of one mod there was
   nothing in the old name to tell them apart, and a downloads folder full of
