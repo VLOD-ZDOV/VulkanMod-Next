@@ -3845,7 +3845,15 @@ final class VkTerrainRenderer {
         if (cardStoppedAnswering) {
             return;
         }
-        waitIdle();
+        // Spelled out rather than shortened, because shortening it is what went
+        // wrong: this wrapper was introduced by replacing every
+        // "vkDeviceWaitIdle(device())" in the file, and the file by then
+        // contained this line too. The method called itself, every frame threw
+        // StackOverflowError into the catch-all in TerrainFrame, and the mod
+        // handed the terrain back to the game and carried on drawing a correct
+        // picture at a plausible frame rate. It cost a whole evening's
+        // measurements before anybody noticed.
+        org.lwjgl.vulkan.VK10.vkDeviceWaitIdle(device());
     }
 
     private boolean renderTranslucent(int[] chunks, int chunkCount, float[] mvp,
