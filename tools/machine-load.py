@@ -242,7 +242,11 @@ def flight_window(log_path, tag):
     start = end = rate = None
     begins = "Flight %s route" % tag
     ends = "Flight %s frame rate" % tag
-    with open(log_path, errors="replace") as handle:
+    try:
+        handle = open(log_path, errors="replace")
+    except OSError as why:
+        sys.exit("Cannot read %s: %s" % (log_path, why.strerror))
+    with handle:
         for line in handle:
             stamp = re.match(r"\[\S+ (\d\d:\d\d:\d\d)", line)
             if not stamp:
