@@ -236,6 +236,22 @@ public final class TerrainFrame {
             sb.append(' ').append(names[i]).append(' ').append(taken[i])
                     .append('/').append(taken[i] + refused[i]);
         }
+        // The ratio said out loud, because reading it off the pairs is a thing
+        // nobody does. A build that threw on every frame and handed the terrain
+        // back to the game printed "solid 1405/10824" here for a whole evening
+        // of measurements; the numbers were in front of me and the sentence was
+        // not, and every frame rate taken that evening was vanilla's.
+        for (int i = 0; i < 4; i++) {
+            int calls = taken[i] + refused[i];
+            if (calls >= 200 && taken[i] * 10L < calls * 9L) {
+                sb.append("\n  WARNING: the ").append(names[i])
+                        .append(" layer went to Vulkan in only ")
+                        .append(100L * taken[i] / calls)
+                        .append("% of the frames that asked for it. The game drew"
+                                + " the rest, so any speed measured here is the"
+                                + " game's, not this renderer's.");
+            }
+        }
         return sb.toString();
     }
 
