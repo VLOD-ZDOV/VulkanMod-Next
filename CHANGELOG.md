@@ -29,6 +29,11 @@
   water for the rest of the session. A worse picture than ours, and an
   incomparably better one than a game you have to kill.
 
+  The same fix had to be made twice. Closing the game after that had happened
+  waited for the card to finish work it was never going to finish, so the
+  window went away, the game reported that it had shut down, and the process
+  stayed alive for as long as you left it. It now closes.
+
 - **Fixed: the game could die on the way out.** Closing the game ended with
   `FATAL ERROR in native method ... The JVM will abort execution` instead of a
   clean exit. The mod was handing OpenGL objects back from the JVM's shutdown
