@@ -99,7 +99,7 @@ def process_jiffies():
                         break
         except (OSError, ValueError, IndexError):
             continue
-        out[int(entry)] = (name, used)
+        out[int(entry)] = (name, used, b" ".join(argv).decode("utf-8", "replace"))
     return out
 
 
@@ -148,8 +148,8 @@ def follow(pattern, out_path, interval, limit):
             busy, idle = new_busy, new_idle
 
             if ours is None or ours not in current:
-                matches = [pid for pid, (name, _) in current.items()
-                           if pattern in name]
+                matches = [pid for pid, entry in current.items()
+                           if pattern in entry[0] or pattern in entry[2]]
                 if matches:
                     # The largest, because a launcher and the thing it launched
                     # both match, and it is the second one that is being timed.
@@ -159,7 +159,7 @@ def follow(pattern, out_path, interval, limit):
 
             movers = []
             mine = 0.0
-            for pid, (name, used) in current.items():
+            for pid, (name, used, _) in current.items():
                 was = previous.get(pid)
                 if was is None or was[0] != name:
                     continue
@@ -258,18 +258,25 @@ def report(path, start, end):
     if util:
         print("  card          %.0f%% busy on average, low %.0f%%"
               % (sum(util) / len(util), min(util)))
-    clock = column("gpu_clock")
+    # Only while the card was working. An idle card drops to a fifth of its
+    # clock and climbs back the moment anything asks it to, which is healthy
+    # behaviour and would otherwise fail every run flown on a quiet desktop.
+    working = [row for row in rows
+               if (number(row, "gpu_percent") or 0.0) >= 20.0
+               and not (int(row.get("gpu_events", "") or "0", 16) & 0x0001)]
+    clock = [value for value in (number(row, "gpu_clock") for row in working)
+             if value is not None]
     if clock and max(clock) > 0:
         drop = 100.0 * (max(clock) - min(clock)) / max(clock)
-        print("  card clock    %.0f to %.0f MHz, a %.0f%% spread"
-              % (min(clock), max(clock), drop))
+        print("  card clock    %.0f to %.0f MHz, a %.0f%% spread, over %d busy samples"
+              % (min(clock), max(clock), drop, len(clock)))
     temperature = column("gpu_temperature")
     if temperature:
         print("  card heat     %.0f to %.0f degrees"
               % (min(temperature), max(temperature)))
 
     reasons = collections.Counter()
-    for row in rows:
+    for row in working:
         try:
             bits = int(row.get("gpu_events", "") or "0", 16)
         except ValueError:
@@ -306,8 +313,8 @@ def report(path, start, end):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--until", metavar="NAME",
-                        help="sample until the process whose command contains "
-                             "this exits")
+                        help="sample until the process whose name or command "
+                             "line contains this exits")
     parser.add_argument("--out", default="machine-load.csv")
     parser.add_argument("--interval", type=float, default=1.0)
     parser.add_argument("--limit", type=float, default=0.0,
