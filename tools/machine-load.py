@@ -59,6 +59,27 @@ CLOCK_EVENTS = [
 ]
 
 
+def ancestors():
+    """Every process between this one and the top, this one included.
+
+    The pattern being searched for is one of our own arguments, so it is also
+    in the command line of the shell that started us and of its shell, and a
+    sentinel that matches its own family reports the thing it is watching as
+    using no processor at all.
+    """
+    seen = set()
+    pid = os.getpid()
+    while pid > 1 and pid not in seen:
+        seen.add(pid)
+        try:
+            with open("/proc/%d/stat" % pid) as handle:
+                text = handle.read()
+            pid = int(text[text.rindex(")") + 2:].split()[1])
+        except (OSError, ValueError, IndexError):
+            break
+    return seen
+
+
 def cpu_busy_idle():
     """Busy and idle jiffies across every core, from the kernel's own counters."""
     with open("/proc/stat") as handle:
@@ -92,11 +113,25 @@ def process_jiffies():
             name = text[text.index("(") + 1:text.rindex(")")]
             if argv and argv[0]:
                 name = os.path.basename(argv[0].decode("utf-8", "replace"))
-                for word in argv[1:4]:
+                # The whole argument list rather than the first few of it. A
+                # game launched by a build tool puts thirty switches before the
+                # class it is going to run, and stopping at the fourth left two
+                # entirely different programs both called "java", collapsed
+                # into one row that belonged to neither.
+                skip = False
+                for word in argv[1:]:
                     word = word.decode("utf-8", "replace")
-                    if word and not word.startswith("-"):
-                        name += " " + os.path.basename(word)
-                        break
+                    if not word:
+                        continue
+                    if skip:
+                        skip = False
+                        continue
+                    if word.startswith("-"):
+                        skip = word in ("-cp", "-classpath", "-p", "--module-path",
+                                        "-m", "--module", "--add-modules")
+                        continue
+                    name += " " + os.path.basename(word)
+                    break
         except (OSError, ValueError, IndexError):
             continue
         out[int(entry)] = (name, used, b" ".join(argv).decode("utf-8", "replace"))
@@ -132,6 +167,7 @@ def gpu_sample():
 def follow(pattern, out_path, interval, limit):
     """Sample until the watched process exits, writing a row per sample."""
     ours = None
+    ours_own = ancestors()
     previous = process_jiffies()
     busy, idle = cpu_busy_idle()
     started = time.time()
@@ -149,11 +185,18 @@ def follow(pattern, out_path, interval, limit):
 
             if ours is None or ours not in current:
                 matches = [pid for pid, entry in current.items()
-                           if pattern in entry[0] or pattern in entry[2]]
+                           if pid not in ours_own
+                           and (pattern in entry[0] or pattern in entry[2])]
                 if matches:
                     # The largest, because a launcher and the thing it launched
                     # both match, and it is the second one that is being timed.
                     ours = max(matches, key=lambda pid: current[pid][1])
+                    # Said out loud, because the alternative is what happened
+                    # the first time this ran: it matched nothing, reported our
+                    # share as zero for four hundred samples, and looked from
+                    # the outside exactly like a game that used no processor.
+                    print("watching %d: %s" % (ours, current[ours][2][:160]),
+                          flush=True)
                 elif ours is not None:
                     break
 
@@ -183,7 +226,7 @@ def follow(pattern, out_path, interval, limit):
             rows += 1
             if limit and time.time() - started > limit:
                 break
-    return rows
+    return rows, ours is not None
 
 
 def parse(path):
@@ -330,8 +373,11 @@ def main():
         return
     if not args.until:
         sys.exit("Give either --until NAME to record or --report CSV to read one.")
-    rows = follow(args.until, args.out, args.interval, args.limit)
+    rows, found = follow(args.until, args.out, args.interval, args.limit)
     print("%d samples written to %s" % (rows, args.out))
+    if not found:
+        print("NOTHING matched %r while this ran, so the \"ours\" column is "
+              "empty rather than zero." % args.until)
     report(args.out, None, None)
 
 
