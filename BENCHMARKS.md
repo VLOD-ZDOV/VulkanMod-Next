@@ -40,6 +40,14 @@ Verified rather than assumed:
   understood two runs of an identical build differed by forty per cent.
 - **The medians are stable.** Every row was measured twice at 1920 × 1080, on separate runs.
   The two agree within four per cent, which is the noise floor of this measurement.
+- **The machine belonged to the measurement**, from now on by record rather than by assumption.
+  A sampler alongside the flight writes down, once a second, what share of the processor and of
+  the graphics card went to anything that was not the game, together with the card's clock and
+  whether it was being held back; a run that did not have the machine to itself is discarded
+  rather than explained. This was added after two runs of an identical build disagreed by
+  seventy-four per cent and the cause turned out to be a second program holding half the
+  processor and half the card's memory. The rows below predate it, and the case for them is the
+  one above: each was flown twice and the pair agreed within four per cent.
 
 ---
 

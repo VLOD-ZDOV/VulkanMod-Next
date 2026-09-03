@@ -17,6 +17,18 @@
   not notice the first release under the new name. From this version on both
   names are recognised, so the next rename will not do it again.
 
+- **Fixed: the game could freeze forever if the graphics driver gave up.** When
+  the card rejects a batch of commands it kills the channel they were sent on,
+  and anything already waiting for that batch to finish waits for something
+  that is never going to happen. One wait in the water and glass pass had no
+  time limit, so that turned into a window that had simply stopped moving: no
+  crash, no error, no message, no processor use, nothing in any log. It now
+  gives up after two seconds — the pass itself takes a fraction of a
+  millisecond, so nothing this catches is a slow frame — writes what the driver
+  said into the log, and hands that layer back to the game, which draws its own
+  water for the rest of the session. A worse picture than ours, and an
+  incomparably better one than a game you have to kill.
+
 - **Fixed: the game could die on the way out.** Closing the game ended with
   `FATAL ERROR in native method ... The JVM will abort execution` instead of a
   clean exit. The mod was handing OpenGL objects back from the JVM's shutdown
