@@ -16,6 +16,16 @@ import java.util.List;
  * default is the invisible kind of wrong: the setting works, and behaves
  * differently from the one the player already knows.
  *
+ * <h2>Which ones are marked as working, and on what evidence</h2>
+ *
+ * Not on the code having been written: on a picture. Each live flag below was
+ * set after the effect was turned to both of its ends on the same route, in the
+ * same world, at the same hour, and the two frames were compared. The bar is
+ * the noise floor of that comparison, measured from three identical runs and
+ * sitting at 0.07% of pixels differing by more than eight of 255 — clouds move
+ * and chunks arrive, so two runs are never byte-identical. Anything at that
+ * floor is not marked live, however finished its code looks.
+ *
  * <h2>Declared is not the same as working</h2>
  *
  * Most of these do nothing here yet, because the part of the mod they steer has
@@ -106,23 +116,23 @@ public final class Settings {
     }
 
     static {
-        add("ambientOcclusion", Category.GENERAL, false, 0, 100, 0, false,
+        add("ambientOcclusion", Category.GENERAL, false, 0, 100, 0, true,
                 "How much a point is darkened by how little of its surroundings it can see, in ");
-        add("aoRadius", Category.GENERAL, false, 1, 6, 2, false,
+        add("aoRadius", Category.GENERAL, false, 1, 6, 2, true,
                 "How far a corner's shadow reaches, in blocks. Larger is softer and spreads ");
-        add("bloom", Category.GENERAL, false, 0, 100, 0, false,
+        add("bloom", Category.GENERAL, false, 0, 100, 0, true,
                 "How much light spills off a glowing surface into what is around it, in percent. ");
-        add("celestialGlint", Category.GENERAL, false, 0, 100, 0, false,
+        add("celestialGlint", Category.GENERAL, false, 0, 100, 0, true,
                 "The sun itself sliding along the ripples, and the moon doing the same at ");
-        add("cloudShadows", Category.GENERAL, false, 0, 100, 0, false,
+        add("cloudShadows", Category.GENERAL, false, 0, 100, 0, true,
                 "How dark a shadow the clouds overhead cast on the world. Read from the very sheet the game draws its clouds from, at the height the world reports and with the drift the game itself counts - so the dark patch lands under the cloud that cast it rather than beside it. Needs the clouds turned on and the sun above the horizon; fades out near the horizon, where the journey up to the cloud layer is long enough that the shadow lands nowhere near what is overhead.");
         add("cloudTint", Category.GENERAL, false, 0, 100, 0, false,
                 "How much of the sky's own colour the clouds take. Vanilla clouds are white at ");
-        add("colourVision", Category.GENERAL, false, 0, 3, 0, false,
+        add("colourVision", Category.GENERAL, false, 0, 3, 0, true,
                 "Move the colours one kind of eye cannot separate into the channels it still can. ");
-        add("contactShadows", Category.GENERAL, false, 0, 100, 0, false,
+        add("contactShadows", Category.GENERAL, false, 0, 100, 0, true,
                 "How dark a short shadow cast along the ground towards the sun may go. It is worked out from the depth of the picture rather than from geometry, so whatever drew into that depth casts one - a chest, a creature, another mod's machine - and nothing is taken away from any mod to get it. It can only find something that is itself on the screen and within about a block of the surface, which is why it is a contact shadow and not a shadow: it fills the gap where a thing meets the floor, and the sun's own long shadows are the traced ones. Shares the ambient occlusion pass, so it costs a loop rather than a pass, and turn on Occlusion Over Everything for it to see anything but blocks.");
-        add("creatureLight", Category.GENERAL, false, 0, 100, 0, false,
+        add("creatureLight", Category.GENERAL, false, 0, 100, 0, true,
                 "How much a creature shades its own faces against the sun, so that a cow in a lit world is lit like the world instead of flat against it. The face is taken from the geometry being drawn rather than from the depth of the picture, so it is exact and has no outline around it. Only the sky half of the game's own lighting is moved, never the block half - a creature in a cave beside a torch is left exactly as the game drew it, whatever this is set to, and that is by construction rather than by tuning. Needs Draw Creatures in Vulkan.");
         add("directionalLightStrength", Category.GENERAL, false, 0, 100, 50, false,
                 "How far dynamic light goes towards caring which way a surface is turned, in ");
@@ -130,7 +140,7 @@ public final class Settings {
                 "How far away a light source may be and still be drawn, in blocks. This is not how ");
         add("dynamicLights", Category.GENERAL, true, 0, 1, 0, false,
                 "Let a carried torch, a dropped glowing block or a burning creature light the ");
-        add("exposure", Category.GENERAL, false, 0, 100, 50, false,
+        add("exposure", Category.GENERAL, false, 0, 100, 50, true,
                 "How much light is let in before the film curve closes the range back down. The middle is no change. Only means anything with the frame above turned on.");
         add("extremeRenderDistance", Category.GENERAL, true, 0, 1, 0, false,
                 "Let the render-distance slider go past 64, up to 128. The game builds a render ");
@@ -138,27 +148,27 @@ public final class Settings {
                 "Fade Vulkan terrain into the distance the way the rest of the scene already does. ");
         add("fogDistance", Category.GENERAL, false, 1, 400, 100, false,
                 "How far the game's own distance fog reaches, as a percentage of what the game ");
-        add("foliageSway", Category.GENERAL, false, 0, 100, 0, false,
+        add("foliageSway", Category.GENERAL, false, 0, 100, 0, true,
                 "How far the top of a plant leans in the wind, in percent. 0 is off. Grass, ");
         add("frameGraph", Category.GENERAL, true, 0, 1, 0, false,
                 "Show a frame-time graph in the bottom-left corner, with the worst and best frame ");
         add("frameGraphIntervalMs", Category.GENERAL, false, 100, 5000, 1000, false,
                 "How often the frame graph recomputes the numbers above it, in milliseconds. The ");
-        add("godRays", Category.GENERAL, false, 0, 100, 0, false,
+        add("godRays", Category.GENERAL, false, 0, 100, 0, true,
                 "How bright the shafts of light from the sun may be. Gathered from the finished picture: the walk from a pixel towards the sun adds up what the sky shows through, so anything standing in the way leaves a dark lane and a gap in a canopy leaves a bright one. No geometry and no rays are involved, so it cannot break another mod - and whatever a mod drew is in the picture and casts its own shafts for free. Needs the sun above the horizon and roughly in front of you; fades out rather than switching off as it leaves the screen.");
         add("hdrFrame", Category.GENERAL, true, 0, 1, 0, true,
                 "Ask the game for a frame with room above white in it. Minecraft draws the world into eight bits a channel, so anything brighter than white is cut off before any effect here ever sees it - which is why the glow has no light to add, a highlight on water arrives already flattened into a white patch, and the tone curve can only tilt colours ");
-        add("heightFog", Category.GENERAL, false, 0, 100, 0, false,
+        add("heightFog", Category.GENERAL, false, 0, 100, 0, true,
                 "How much colour the ground below you gives up to fog, in percent. 0 is off. It ");
-        add("heightFogDepth", Category.GENERAL, false, 4, 96, 24, false,
+        add("heightFogDepth", Category.GENERAL, false, 4, 96, 24, true,
                 "The drop below the camera, in blocks, over which height fog reaches nearly all ");
-        add("iceShine", Category.GENERAL, false, 0, 100, 0, false,
+        add("iceShine", Category.GENERAL, false, 0, 100, 0, true,
                 "How much of the sky ice gathers on its surface. The game draws ice as a flat ");
         add("leafGlow", Category.GENERAL, false, 0, 100, 0, false,
                 "How brightly a leaf lets the sun through from behind it. The game shades a leaf ");
         add("leafShadows", Category.GENERAL, false, 0, 100, 0, false,
                 "How much light gets through leaves and plants in a traced shadow. A ray cannot ");
-        add("lightSoftness", Category.GENERAL, false, 0, 100, 30, false,
+        add("lightSoftness", Category.GENERAL, false, 0, 100, 30, true,
                 "How soft the edge of a shadow cast by a torch or a fire is. Separate from the ");
         add("moonSize", Category.GENERAL, false, 0, 100, 40, false,
                 "How large the moon is drawn. Same trick as the sun: the quad the game gives it ");
@@ -172,23 +182,23 @@ public final class Settings {
                 "Draw the moon as a round disc with a soft glow. The game does not draw a moon so ");
         add("roundSun", Category.GENERAL, true, 0, 1, 0, false,
                 "Draw the sun as a round, warm disc instead of vanilla's square. The picture is ");
-        add("sceneGamma", Category.GENERAL, false, 0, 100, 50, false,
+        add("sceneGamma", Category.GENERAL, false, 0, 100, 50, true,
                 "How the finished frame is bent before it reaches the screen. Fifty is the frame ");
         add("sceneOcclusion", Category.GENERAL, true, 0, 1, 0, true,
                 "Darken the corners of the whole picture rather than of the blocks alone. The ");
-        add("sceneTone", Category.GENERAL, false, 0, 100, 0, false,
+        add("sceneTone", Category.GENERAL, false, 0, 100, 0, true,
                 "How strongly the finished picture is graded — contrast in the middle, warmth in ");
-        add("sceneWarmth", Category.GENERAL, false, 0, 100, 50, false,
+        add("sceneWarmth", Category.GENERAL, false, 0, 100, 50, true,
                 "Which way the grading leans. The middle is neutral, above it warm, below it ");
-        add("screenReflections", Category.GENERAL, false, 0, 100, 0, false,
+        add("screenReflections", Category.GENERAL, false, 0, 100, 0, true,
                 "How much of a water reflection is the world actually standing there rather than ");
-        add("shadowSoftness", Category.GENERAL, false, 0, 100, 35, false,
+        add("shadowSoftness", Category.GENERAL, false, 0, 100, 35, true,
                 "How soft the edge of a traced shadow is. One ray gives one answer per pixel, so ");
-        add("skyGradient", Category.GENERAL, false, 0, 100, 0, false,
+        add("skyGradient", Category.GENERAL, false, 0, 100, 0, true,
                 "How much deeper the sky gets away from the horizon. Vanilla's sky is one colour ");
-        add("sunHaze", Category.GENERAL, false, 0, 100, 0, false,
+        add("sunHaze", Category.GENERAL, false, 0, 100, 0, true,
                 "How much the fog warms towards the sun and cools away from it. The game fogs ");
-        add("sunShadows", Category.GENERAL, false, 0, 100, 0, false,
+        add("sunShadows", Category.GENERAL, false, 0, 100, 0, true,
                 "How dark the sun's shadow is, traced against the terrain. Needs Terrain ");
         add("sunSize", Category.GENERAL, false, 0, 100, 50, false,
                 "How large the disc is drawn. The quad the game gives the sun cannot be resized ");

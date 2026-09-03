@@ -51,6 +51,12 @@ public final class VulkanConfig {
         } catch (IOException failed) {
             VulkanModNext.LOGGER.warn("Could not read {}, using defaults: {}",
                     file.getName(), failed.toString());
+            // Sent even so. The defaults are already in the map above, and the
+            // renderer reads settings only as system properties — so leaving
+            // without this is not "fall back to defaults", it is a renderer
+            // that never hears a single setting because a file could not be
+            // opened.
+            publish();
             return;
         }
         int read = 0;
