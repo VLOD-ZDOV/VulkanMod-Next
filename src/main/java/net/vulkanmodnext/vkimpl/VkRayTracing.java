@@ -1150,7 +1150,9 @@ final class VkRayTracing {
         if (!ready) {
             return;
         }
-        vkDeviceWaitIdle(device());
+        if (!VkTerrainRenderer.cardStoppedAnswering) {
+            vkDeviceWaitIdle(device());
+        }
         for (Blas blas : structures.values()) {
             destroyBlas(blas);
         }

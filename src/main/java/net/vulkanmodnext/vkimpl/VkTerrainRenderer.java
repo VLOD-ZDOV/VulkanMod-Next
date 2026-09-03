@@ -2343,7 +2343,7 @@ final class VkTerrainRenderer {
         if (structure == 0 || descriptorSet == 0) {
             return;
         }
-        vkDeviceWaitIdle(device());
+        waitIdle();
         try (MemoryStack stack = stackPush()) {
             LongBuffer handle = stack.longs(structure);
             org.lwjgl.vulkan.VkWriteDescriptorSetAccelerationStructureKHR structureInfo =
@@ -3140,7 +3140,9 @@ final class VkTerrainRenderer {
             if (!SHARED_SEMAPHORES) {
                 // Nothing will tell OpenGL when these images are finished, so
                 // finishing them here is the only ordering left.
-                vkQueueWaitIdle(ctx.getGraphicsQueue());
+                if (!cardStoppedAnswering) {
+                    vkQueueWaitIdle(ctx.getGraphicsQueue());
+                }
             }
             firstFrameStage("submitted");
             if (tracingFirstFrame) {
@@ -3179,7 +3181,7 @@ final class VkTerrainRenderer {
      * answer.
      */
     synchronized boolean drawsTranslucent() {
-        return !translucentLost && translucentFramebuffer != 0 && canReturnDepth();
+        return !cardStoppedAnswering && translucentFramebuffer != 0 && canReturnDepth();
     }
 
     /**
@@ -3394,7 +3396,7 @@ final class VkTerrainRenderer {
             // before this one may still be reading from it — its fence is a
             // different one from the fence waited on above. Rare enough to
             // afford the bluntest possible answer.
-            vkDeviceWaitIdle(device());
+            waitIdle();
             ensureQuadIndexCapacity(quads);
         }
         return true;
@@ -3631,7 +3633,7 @@ final class VkTerrainRenderer {
         if (spriteImages[slot] == 0) {
             return;
         }
-        vkDeviceWaitIdle(device());
+        waitIdle();
         vkDestroyImageView(device(), spriteViews[slot], null);
         vkDestroyImage(device(), spriteImages[slot], null);
         vkFreeMemory(device(), spriteMemories[slot], null);
@@ -3652,7 +3654,7 @@ final class VkTerrainRenderer {
         if (spriteSets[slot] == 0 || view == 0 || sampler == 0) {
             return;
         }
-        vkDeviceWaitIdle(device());
+        waitIdle();
         try (MemoryStack stack = stackPush()) {
             VkDescriptorImageInfo.Buffer info = VkDescriptorImageInfo.calloc(1, stack);
             info.get(0).sampler(sampler).imageView(view)
@@ -3823,7 +3825,11 @@ final class VkTerrainRenderer {
     private static final long TRANSLUCENT_FENCE_TIMEOUT_NANOS = 2_000_000_000L;
 
     /**
-     * Set when the card stopped answering for this pass, and never cleared.
+     * Set when the card stopped answering, and never cleared.
+     *
+     * Static and shared, because there is one device: a card that has stopped
+     * answering has stopped answering for everything, not for the renderer
+     * instance that happened to notice.
      *
      * Every other wait in this renderer is bounded; this one was not, and what
      * that cost was measured on a flight that never finished. The card raised a
@@ -3838,8 +3844,30 @@ final class VkTerrainRenderer {
      * Once it is set the layer goes back to the game, which draws its own
      * water. That is a worse picture than ours and an incomparably better one
      * than none, and it leaves a running game to report from.
+     *
+     * It also turns off every wait for the device to go idle. Those have no
+     * timeout to bound — {@code vkDeviceWaitIdle} takes no such argument — so
+     * the first fix left the same hang standing in the teardown path, where it
+     * was found the same evening: the game was told to close, printed that it
+     * had, and the process then sat in {@code vkDeviceWaitIdle} for
+     * twenty-five minutes. Waiting for a dead device to finish work it will
+     * never finish is not caution, it is the hang.
      */
-    private boolean translucentLost;
+    static volatile boolean cardStoppedAnswering;
+
+    /**
+     * Waits for the device to finish everything, unless it never will.
+     *
+     * The objects are still destroyed afterwards. Destroying is defined to be
+     * safe on a lost device and is what the specification asks for; it is only
+     * the waiting that cannot be allowed to run.
+     */
+    private void waitIdle() {
+        if (cardStoppedAnswering) {
+            return;
+        }
+        waitIdle();
+    }
 
     private boolean renderTranslucent(int[] chunks, int chunkCount, float[] mvp,
                                       double viewX, double viewY, double viewZ,
@@ -3847,7 +3875,7 @@ final class VkTerrainRenderer {
         // Sprites are drawn in this pass, so a frame with particles and no
         // water still needs it. Without that second term, standing in a desert
         // and breaking a block put the particles nowhere at all.
-        if (translucentLost || translucentFramebuffer == 0 || !canReturnDepth()
+        if (cardStoppedAnswering || translucentFramebuffer == 0 || !canReturnDepth()
                 || (chunkCount == 0 && spriteBatchCount == 0)) {
             // With no way to get the game's depth back, drawing the layer
             // would be worse than leaving it where it is.
@@ -3877,7 +3905,7 @@ final class VkTerrainRenderer {
                 // two seconds averaged into a column that reads in hundredths
                 // of a millisecond would bury the one frame worth looking at
                 // under the six hundred that were fine.
-                translucentLost = true;
+                cardStoppedAnswering = true;
                 LOGGER.error("The card never finished the translucent pass: "
                         + "vkWaitForFences returned {} after {} ms, fence status {}. "
                         + "Handing this layer back to the game for the rest of the "
@@ -7750,7 +7778,7 @@ final class VkTerrainRenderer {
         if (target <= indirectDrawCapacity) {
             return;
         }
-        vkDeviceWaitIdle(device());
+        waitIdle();
         destroyDrawBatches();
         indirectDrawCapacity = target;
         drawCommandOffset = (long) target * DRAW_ORIGIN_BYTES;
@@ -8368,7 +8396,7 @@ final class VkTerrainRenderer {
         if (descriptorSet == 0 || atlasImage == 0 || lightmapImage == 0) {
             return;
         }
-        vkDeviceWaitIdle(device());
+        waitIdle();
         writeDescriptors();
     }
 
@@ -10383,7 +10411,7 @@ final class VkTerrainRenderer {
             // buffer freed while a command buffer is reading it — which the
             // validation layer reports and a driver is free to fault on. It
             // happens a handful of times a session.
-            vkDeviceWaitIdle(device());
+            waitIdle();
             vkDestroyBuffer(device(), quadIndexBuffer, null);
             vkFreeMemory(device(), quadIndexMemory, null);
         }
@@ -10722,7 +10750,7 @@ final class VkTerrainRenderer {
         // memory a copy is reading from is a fault in the driver, not an
         // exception here.
         if (atlasImage != 0 || atlasStagingBuffer != null) {
-            vkDeviceWaitIdle(device());
+            waitIdle();
         }
         destroyAtlasStaging();
         if (atlasImage != 0) {
@@ -10745,7 +10773,7 @@ final class VkTerrainRenderer {
         if (colorImage == 0) {
             return;
         }
-        vkDeviceWaitIdle(device());
+        waitIdle();
         if (glColorTexture != -1 && glContextCurrent()) {
             // Sized from this target, so they go with it.
             destroyBloomTargets();
@@ -10827,7 +10855,7 @@ final class VkTerrainRenderer {
         if (!baseReady) {
             return;
         }
-        vkDeviceWaitIdle(device());
+        waitIdle();
         if (rayTracing != null) {
             rayTracing.destroy();
             rayTracing = null;
