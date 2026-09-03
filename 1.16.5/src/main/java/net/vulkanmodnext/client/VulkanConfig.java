@@ -126,6 +126,49 @@ public final class VulkanConfig {
             {"geometryBudgetMiB", "vulkanmodnext.geometryBudget"},
             {"vulkanDevice", "vulkanmodnext.vulkanDevice"},
             {"atlasPixelsSeen", "vulkanmodnext.atlasPixelsSeen"},
+
+            // Everything below steers the terrain shader, which is already here:
+            // the Vulkan half was ported whole and reads all of these, and the
+            // game half simply never sent them. Found by asking the two halves
+            // rather than by reading either — see tools/parity.py.
+            //
+            // Sent is not the same as working. A property that reaches a shader
+            // which then ignores it is exactly the check with no consumer this
+            // table's comment warns about, so none of these is marked live in
+            // Settings until a picture proves it moved.
+            {"ambientOcclusion", "vulkanmodnext.ambientOcclusion"},
+            {"aoRadius", "vulkanmodnext.aoRadius"},
+            {"bloom", "vulkanmodnext.bloom"},
+            {"celestialGlint", "vulkanmodnext.celestialGlint"},
+            {"cloudShadows", "vulkanmodnext.cloudShadows"},
+            {"colourVision", "vulkanmodnext.colourVision"},
+            {"contactShadows", "vulkanmodnext.contactShadows"},
+            {"creatureLight", "vulkanmodnext.creatureLight"},
+            {"exposure", "vulkanmodnext.exposure"},
+            {"foliageSway", "vulkanmodnext.foliageSway"},
+            {"godRays", "vulkanmodnext.godRays"},
+            {"heightFog", "vulkanmodnext.heightFog"},
+            {"heightFogDepth", "vulkanmodnext.heightFogDepth"},
+            {"iceShine", "vulkanmodnext.iceShine"},
+            {"leafGlow", "vulkanmodnext.leafGlow"},
+            {"leafShadows", "vulkanmodnext.leafShadows"},
+            {"lightSoftness", "vulkanmodnext.lightSoftness"},
+            {"sceneGamma", "vulkanmodnext.sceneGamma"},
+            {"sceneTone", "vulkanmodnext.sceneTone"},
+            {"sceneWarmth", "vulkanmodnext.sceneWarmth"},
+            {"screenReflections", "vulkanmodnext.screenReflections"},
+            {"shadowSoftness", "vulkanmodnext.shadowSoftness"},
+            {"skyGradient", "vulkanmodnext.skyGradient"},
+            {"sunHaze", "vulkanmodnext.sunHaze"},
+            {"sunShadows", "vulkanmodnext.sunShadows"},
+            {"temporalAccumulation", "vulkanmodnext.temporalAccumulation"},
+            {"tracedBlockLight", "vulkanmodnext.tracedBlockLight"},
+            {"tracedLights", "vulkanmodnext.tracedLights"},
+            {"waterCaustics", "vulkanmodnext.waterCaustics"},
+            {"waterReflection", "vulkanmodnext.waterReflection"},
+            {"waterRefraction", "vulkanmodnext.waterRefraction"},
+            {"waterWaves", "vulkanmodnext.waterWaves"},
+            {"wetSurfaces", "vulkanmodnext.wetSurfaces"},
     };
 
     /**
@@ -144,11 +187,20 @@ public final class VulkanConfig {
             if (setting == null) {
                 continue;
             }
-            if (System.getProperty(pair[1]) != null && !published) {
+            if (!published && System.getProperty(pair[1]) != null) {
                 // Set on the command line before we ever ran. A launcher flag
                 // is a deliberate act and outranks the config file — the same
                 // rule the scratch stack follows, and the reason a diagnostic
                 // run can be made without editing somebody's settings.
+                //
+                // Remembered rather than decided again, because this method now
+                // runs every time a slider moves: asking "was it already set"
+                // on the second call would see the value this method itself
+                // wrote and hand the launcher flag back to the config file.
+                fromCommandLine.add(pair[0]);
+                continue;
+            }
+            if (fromCommandLine.contains(pair[0])) {
                 continue;
             }
             int value = get(pair[0]);
@@ -156,7 +208,19 @@ public final class VulkanConfig {
                     ? Boolean.toString(value != 0) : Integer.toString(value));
         }
         published = true;
+        // One number the renderer can look at instead of the fifty above it.
+        // It reads them all when this moves and skips them when it has not,
+        // which is what makes publishing on every slider move affordable.
+        System.setProperty("vulkanmodnext.settingsVersion",
+                Long.toString(SETTINGS_VERSION.incrementAndGet()));
     }
+
+    /** Keys a launcher flag owns, so the config file never takes them back. */
+    private static final java.util.Set<String> fromCommandLine =
+            new java.util.HashSet<>();
+
+    private static final java.util.concurrent.atomic.AtomicLong SETTINGS_VERSION =
+            new java.util.concurrent.atomic.AtomicLong();
 
     static {
     }
@@ -181,6 +245,11 @@ public final class VulkanConfig {
 
     public static void set(Settings.Setting setting, int value) {
         VALUES.put(setting.key, clamp(setting, value));
+        // The renderer reads settings as system properties, so a value that
+        // only reaches this map is a value the picture never sees. Every way
+        // of changing a setting goes through here, which is why it is here and
+        // not in the screen that called it.
+        publish();
     }
 
     public static void reset() {
