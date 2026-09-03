@@ -156,15 +156,53 @@ def gpu_sample():
                "events": int(parts[4], 16)}
     except (OSError, ValueError, IndexError, subprocess.SubprocessError):
         return None
-    try:
-        apps = subprocess.run(
-            ["nvidia-smi", "--query-compute-apps=pid,used_memory",
-             "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=4).stdout.strip()
-        gpu["apps"] = len([line for line in apps.splitlines() if line.strip()])
-    except (OSError, subprocess.SubprocessError):
-        gpu["apps"] = -1
     return gpu
+
+
+def gpu_processes(ours):
+    """What each process actually did with the card in the last second.
+
+    Residency is not use. A program can hold gigabytes of the card's memory and
+    take none of its time, and a verdict that fails a run for that fails every
+    run on a machine with a model loaded — which is to say it stops meaning
+    anything. This asks the card's own sampler who used it, not who is sitting
+    on it.
+
+    It returns at once, reporting the card's own most recent window rather than
+    opening one, so it is not a clock and the caller still has to keep its own.
+    Taking it for a clock cost eighty-eight samples in four seconds, each one
+    running two subprocesses — a sentinel that had become the loudest thing on
+    the machine it was there to listen to.
+
+    Where there is no such card it returns None.
+    """
+    try:
+        text = subprocess.run(["nvidia-smi", "pmon", "-c", "1", "-s", "u"],
+                              capture_output=True, text=True, timeout=20).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    busy = 0.0
+    resident = 0
+    for line in text.splitlines():
+        if line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) < 4:
+            continue
+        try:
+            pid = int(parts[1])
+        except ValueError:
+            continue
+        resident += 1
+        if pid == ours:
+            continue
+        try:
+            busy += float(parts[3])
+        except ValueError:
+            # A dash, which is the sampler saying this process did nothing
+            # worth recording in the window.
+            pass
+    return busy, resident
 
 
 def follow(pattern, out_path, interval, limit):
@@ -177,9 +215,10 @@ def follow(pattern, out_path, interval, limit):
     rows = 0
     with open(out_path, "w") as out:
         out.write("time,busy_percent,ours_percent,gpu_percent,gpu_clock,"
-                  "gpu_temperature,gpu_apps,gpu_events,others\n")
+                  "gpu_temperature,gpu_apps,gpu_others,gpu_events,others\n")
         while True:
             time.sleep(interval)
+            paced = gpu_processes(ours)
             current = process_jiffies()
             new_busy, new_idle = cpu_busy_idle()
             spent = (new_busy - busy) + (new_idle - idle)
@@ -218,10 +257,12 @@ def follow(pattern, out_path, interval, limit):
 
             gpu = gpu_sample() or {}
             movers.sort(reverse=True)
-            out.write("%s,%.1f,%.1f,%s,%s,%s,%s,%s,%s\n" % (
+            out.write("%s,%.1f,%.1f,%s,%s,%s,%s,%s,%s,%s\n" % (
                 time.strftime("%H:%M:%S"), busy_share, mine,
                 gpu.get("util", ""), gpu.get("clock", ""),
-                gpu.get("temperature", ""), gpu.get("apps", ""),
+                gpu.get("temperature", ""),
+                "" if paced is None else paced[1],
+                "" if paced is None else "%.0f" % paced[0],
                 "0x%x" % gpu["events"] if "events" in gpu else "",
                 " | ".join("%s %.0f%%" % (name, share)
                            for share, name in movers[:4])))
@@ -363,8 +404,15 @@ def report(path, start, end):
         print("  card held back by: " + ", ".join(
             "%s (%d samples)" % (what, count) for what, count in reasons.most_common()))
 
-    apps = column("gpu_apps")
-    extra = [value for value in apps if value > 1]
+    # What the neighbours took from the card, as opposed to how many of them
+    # were merely sitting on it.
+    stolen = column("gpu_others")
+    if stolen:
+        print("  card, others  %.0f%% of its time on average, peak %.0f%%"
+              % (sum(stolen) / len(stolen), max(stolen)))
+    resident = column("gpu_apps")
+    if resident and max(resident) > 1 and not stolen:
+        print("  card          shared with %d other program(s)" % (max(resident) - 1))
 
     # The verdict, which is the whole point: a run either owned the machine or
     # it did not, and a run that did not is thrown away rather than explained.
@@ -376,8 +424,11 @@ def report(path, start, end):
         complaints.append("the card changed its clock by more than a seventh")
     if reasons:
         complaints.append("the card was held back")
-    if extra:
-        complaints.append("a second program was on the card")
+    if stolen and sum(stolen) / len(stolen) >= 2.0:
+        complaints.append("another program was using the card")
+    elif not stolen and resident and max(resident) > 1:
+        complaints.append("another program was on the card, and this recording "
+                          "cannot say whether it was using it")
     if complaints:
         print("NOT CLEAN: " + "; ".join(complaints) + ".")
         print("Throw this run away and fly it again.")
