@@ -97,6 +97,11 @@ layout(set = 0, binding = 3, std140) uniform Frame {
     //     what decides how far a glint is allowed to go past white.
     // w = how brightly a leaf lets the sun through from behind. 0 off.
     vec4 world;
+    // xyz = where the eye is relative to the origin vRelative is measured
+    //       from, which is the view entity's feet rather than its eye: a
+    //       standing player's is about 1.62 up, a third-person camera's is
+    //       behind and above. w unused.
+    vec4 eye;
 } frame;
 
 layout(push_constant) uniform Draw {
@@ -582,6 +587,14 @@ const float FOLIAGE_STOPS = 0.72;
 const float CUTOUT_STOPS = 0.34;
 
 /**
+ * The instance mask a shadow ray asks for. Everything but the cross-shaped
+ * plants carries bit 1; plants carry bit 2 only (see VkRayTracing), so they
+ * cast no traced shadow. Without their texture a ray sees a tuft of grass as
+ * its whole square quad, and that square was the shadow it threw.
+ */
+const uint SHADOW_CASTERS = 0x01u;
+
+/**
  * A number that belongs to this quad and this pixel, and moves between frames.
  *
  * Per primitive, so the speckle sits on the leaf rather than swimming across
@@ -623,7 +636,7 @@ bool rayBlocked(vec3 from, vec3 direction, float start, float reach) {
     if (BLEND) {
         rayQueryInitializeEXT(query, terrainStructure,
                 gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT,
-                0xFFu, from, start, direction, reach);
+                SHADOW_CASTERS, from, start, direction, reach);
         rayQueryProceedEXT(query);
         return rayQueryGetIntersectionTypeEXT(query, true)
                 != gl_RayQueryCommittedIntersectionNoneEXT;
@@ -633,7 +646,7 @@ bool rayBlocked(vec3 from, vec3 direction, float start, float reach) {
             // ray flag it overrules what each structure says about itself, so
             // with it set the loop below could never run.
             gl_RayFlagsTerminateOnFirstHitEXT,
-            0xFFu, from, start, direction, reach);
+            SHADOW_CASTERS, from, start, direction, reach);
     // frame.world.z: one when this renderer's own colour target has room above
     // white in it, zero when it is eight bits a channel. What reads it is the
     // ceiling of the sun's highlight, which has to be two different numbers
@@ -748,7 +761,11 @@ float sunShadow(vec3 normal) {
         return 0.0;
     }
     float facing = dot(normal, frame.sun.xyz);
-    if (facing <= 0.0) {
+    // Strictly turned away. The sun runs east to west with no north or south
+    // in it, so a wall facing north or south meets it at exactly zero; "at
+    // most zero" left every such wall unshadowed, and a tree's shadow crossing
+    // the ground stopped dead where it met one.
+    if (facing < 0.0) {
         return 0.0;
     }
     // Faded in as the sun climbs, not switched on when it clears a threshold.
@@ -772,7 +789,19 @@ float sunShadow(vec3 normal) {
     // ray skimming its own surface and finding it — which reads as a crawling
     // stipple over everything flat, exactly where the shadows are longest and
     // most visible.
-    vec3 from = vRelative + normal * (0.02 + 0.14 * (1.0 - facing));
+    //
+    // It was 0.02 + 0.14 over the grazing range, and a lift that large moves
+    // the shadow itself: on the ground its edge slides towards what cast it by
+    // the lift over the tangent of the sun's height, a third of a block at a
+    // low sun, which reads as a shadow come loose from its object. Smaller,
+    // and growing with distance instead, where the precision it guards is
+    // actually lost. Plants keep the old lift: they sway, the structure holds
+    // them still, and a smaller lift starts the ray behind their own copy.
+    float lift = 0.01 + 0.0005 * vDistance + 0.06 * (1.0 - facing);
+    if (isFoliage(vMaterial & MATERIAL_MASK)) {
+        lift = max(lift, 0.02 + 0.14 * (1.0 - facing));
+    }
+    vec3 from = vRelative + normal * lift;
     // Which way to look, spread over how wide the sun is made to be.
     //
     // One ray gives one answer, so its edge is a staircase along the pixel
@@ -793,6 +822,13 @@ float sunShadow(vec3 normal) {
         float angle = ditherValue(gl_FragCoord.xy) * 6.2831853;
         float radius = sqrt(ditherValue(gl_FragCoord.xy + 5.588238)) * spread;
         direction = normalize(direction + (cos(angle) * tangent + sin(angle) * bitangent) * radius);
+        // Never into the surface it starts on. At a low sun the spread tips
+        // some rays below the face, and those find the face itself a block or
+        // so along: a stipple of shadow over sunlit ground.
+        float below = dot(direction, normal);
+        if (below < 0.01) {
+            direction = normalize(direction + normal * (0.01 - below));
+        }
     }
     return rayBlocked(from, direction, 0.01, reach) ? frame.sun.w * fade : 0.0;
 #else
@@ -881,8 +917,9 @@ float lightBlocked(vec3 normal, vec3 toSource, float distance) {
  * in a block model is flat, so the cross product of the two screen-space
  * derivatives is the exact face normal here, not an approximation of it.
  *
- * vRelative is the surface with the eye at the origin, so the direction back to
- * the camera is its negation. Which way the cross product points depends on the
+ * vRelative is the surface measured from the view entity's feet, and
+ * frame.eye is where the camera stands from there, so the direction back to
+ * the camera is their difference. Which way the cross product points depends on the
  * winding as it lands on screen, so the result is turned to face the camera
  * rather than trusted.
  */
@@ -928,7 +965,12 @@ vec3 faceNormal() {
     // of the surface's position, which is a clean number, where against the
     // measured normal it was a dot product of two noisy ones and could come
     // out either way exactly when the face was hardest to measure.
-    return dot(n, vRelative) > 0.0 ? -n : n;
+    // Towards the eye, not towards the origin of vRelative, which is the view
+    // entity's feet. Measured from the feet, every top face between the feet
+    // and the eye — the block beside you, a slab, a table — was turned to
+    // face down, and so was every wall between a third-person camera and the
+    // player: never shadowed, and wrong for everything else keyed off it.
+    return dot(n, vRelative - frame.eye.xyz) > 0.0 ? -n : n;
 }
 
 // Roughly half the width of a torch flame, in blocks. What it controls is how
@@ -1152,18 +1194,13 @@ float distanceOf(float depth) {
  * That copy is the raw frame: its traced shadow edges and leaf dapple are
  * dithered per pixel and only averaged later, in OpenGL, into a target this
  * pass never reads. Refracted or reflected as it is, that dither lands on the
- * water as grain. Four diagonal taps a texel out cancel most of it; the
- * sampler is linear, so each tap is itself a small average.
+ * water as grain. The sampler is linear, which softens it; four taps would
+ * cancel most of it, and are not taken, because the only build with that
+ * dither is the tracing one, whose water pipeline has no room left for three
+ * more dependent reads (see WHY_NOT_WITH_RAY_QUERY).
  */
 vec3 sceneColorAt(vec2 uv) {
-#ifdef RAY_QUERY
-    return 0.25 * (textureLodOffset(sceneColor, uv, 0.0, ivec2(-1, -1)).rgb
-                 + textureLodOffset(sceneColor, uv, 0.0, ivec2( 1, -1)).rgb
-                 + textureLodOffset(sceneColor, uv, 0.0, ivec2(-1,  1)).rgb
-                 + textureLodOffset(sceneColor, uv, 0.0, ivec2( 1,  1)).rgb);
-#else
     return textureLod(sceneColor, uv, 0.0).rgb;
-#endif
 }
 
 vec4 traceReflection(vec3 origin, vec3 dir) {

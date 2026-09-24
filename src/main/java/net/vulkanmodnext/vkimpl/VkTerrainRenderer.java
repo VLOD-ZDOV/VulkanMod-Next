@@ -2343,6 +2343,12 @@ final class VkTerrainRenderer {
             rayTracing.setCreatureGeometry(spriteVertexBuffers[previous],
                     (long) creatureFirstVertex[previous] * SPRITE_VERTEX_STRIDE,
                     creatureVertexCount[previous]);
+            // Moved by however far the view has come since they were drawn,
+            // or a mob's shadow trails it by one frame of the camera's motion:
+            // a tenth of a block walking, half a block flying.
+            rayTracing.setCreatureShift((float) (creatureViewX[previous] - viewX),
+                    (float) (creatureViewY[previous] - viewY),
+                    (float) (creatureViewZ[previous] - viewZ));
         } else {
             rayTracing.setCreatureGeometry(0L, 0L, 0);
         }
@@ -3441,12 +3447,23 @@ final class VkTerrainRenderer {
      */
     private int[] creatureFirstVertex;
     private int[] creatureVertexCount;
+    /**
+     * Where the view stood when each slot's creatures were drawn. Their
+     * vertices are relative to that point, and the structure is built a frame
+     * later, from a point that has moved on with the camera.
+     */
+    private double[] creatureViewX;
+    private double[] creatureViewY;
+    private double[] creatureViewZ;
     private boolean creatureSpanWarned;
 
     private void noteCreatureSpan(int slot) {
         if (creatureFirstVertex == null || creatureFirstVertex.length != framesInFlight) {
             creatureFirstVertex = new int[framesInFlight];
             creatureVertexCount = new int[framesInFlight];
+            creatureViewX = new double[framesInFlight];
+            creatureViewY = new double[framesInFlight];
+            creatureViewZ = new double[framesInFlight];
         }
         int first = Integer.MAX_VALUE;
         int end = 0;
@@ -3476,6 +3493,9 @@ final class VkTerrainRenderer {
         }
         creatureFirstVertex[slot] = first;
         creatureVertexCount[slot] = total;
+        creatureViewX[slot] = viewWorldX;
+        creatureViewY[slot] = viewWorldY;
+        creatureViewZ[slot] = viewWorldZ;
     }
 
     /** Records this frame's sprite batches into the translucent pass. */
@@ -4640,12 +4660,20 @@ final class VkTerrainRenderer {
         final double cell = 12.0;
         final double sheetCells = 256.0;
         double perBlock = 1.0 / (cell * sheetCells);
-        double baseU = ((viewWorldX + cloudDrift) / cell) / sheetCells;
-        double baseV = ((viewWorldZ / cell) + 0.33) / sheetCells;
+        // From the eye, which is where the shader's positions are measured
+        // from; the render origin is the feet, and using it put the shadow a
+        // block and a half off whenever the sun was not overhead. And the
+        // clouds' underside is a third of a block above the height the world
+        // reports, which is how the game itself draws them.
+        double eyeX = viewWorldX + cameraOffset[0];
+        double eyeY = viewWorldY + cameraOffset[1];
+        double eyeZ = viewWorldZ + cameraOffset[2];
+        double baseU = ((eyeX + cloudDrift) / cell) / sheetCells;
+        double baseV = ((eyeZ / cell) + 0.33) / sheetCells;
         baseU -= Math.floor(baseU);
         baseV -= Math.floor(baseV);
         GL20C.glUniform4f(aoCloudUvUniform, (float) baseU, (float) baseV,
-                (float) perBlock, (float) (cloudHeight - viewWorldY));
+                (float) perBlock, (float) (cloudHeight + 0.33 - eyeY));
         GL20C.glUniform3f(aoSunWorldUniform,
                 sunDirection[0], sunDirection[1], sunDirection[2]);
         modelViewMatrix.clear();
@@ -8057,6 +8085,12 @@ final class VkTerrainRenderer {
                 colourFormat == VK_FORMAT_R16G16B16A16_SFLOAT ? 1.0f : 0.0f);
         // How brightly a leaf lets the sun through from behind it.
         MemoryUtil.memPutFloat(base + 1020, leafGlow);
+        // Where the eye is from the point the geometry is offset from, so the
+        // shader can turn a face towards the camera rather than the feet.
+        MemoryUtil.memPutFloat(base + 1024, cameraOffset[0]);
+        MemoryUtil.memPutFloat(base + 1028, cameraOffset[1]);
+        MemoryUtil.memPutFloat(base + 1032, cameraOffset[2]);
+        MemoryUtil.memPutFloat(base + 1036, 0.0f);
     }
 
     /**
