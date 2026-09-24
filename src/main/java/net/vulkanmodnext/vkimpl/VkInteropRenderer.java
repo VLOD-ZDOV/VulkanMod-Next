@@ -47,6 +47,7 @@ import org.lwjgl.vulkan.VkRenderPassCreateInfo;
 import org.lwjgl.vulkan.VkSemaphoreCreateInfo;
 import org.lwjgl.vulkan.VkShaderModuleCreateInfo;
 import org.lwjgl.vulkan.VkSubmitInfo;
+import org.lwjgl.vulkan.VkSubpassDependency;
 import org.lwjgl.vulkan.VkSubpassDescription;
 import org.lwjgl.vulkan.VkViewport;
 
@@ -225,7 +226,7 @@ final class VkInteropRenderer {
 
             VkMemoryAllocateInfo alloc = VkMemoryAllocateInfo.calloc(stack)
                     .sType(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO)
-                    .pNext(export.address())
+                    .pNext(Interop.appendWin32MemoryRights(stack, export.address()))
                     .allocationSize(req.size())
                     .memoryTypeIndex(findMemoryType(stack, req.memoryTypeBits(), VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
             LongBuffer pMemory = stack.mallocLong(1);
@@ -282,7 +283,7 @@ final class VkInteropRenderer {
                     .handleTypes(Interop.semaphoreHandleType());
             VkSemaphoreCreateInfo semInfo = VkSemaphoreCreateInfo.calloc(stack)
                     .sType(VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO)
-                    .pNext(export.address());
+                    .pNext(Interop.appendWin32SemaphoreRights(stack, export.address()));
 
             LongBuffer pSem = stack.mallocLong(1);
             check(vkCreateSemaphore(device(), semInfo, null, pSem), "vkCreateSemaphore(signal)");
@@ -321,10 +322,24 @@ final class VkInteropRenderer {
                     .colorAttachmentCount(1)
                     .pColorAttachments(colorRef);
 
+            // The frame waits on GL's semaphore at COLOR_ATTACHMENT_OUTPUT, but
+            // the implicit external dependency lets the UNDEFINED -> attachment
+            // layout transition run at TOP_OF_PIPE, before that wait, while GL
+            // may still be sampling. Tie it to the waited stage instead.
+            VkSubpassDependency.Buffer dependency = VkSubpassDependency.calloc(1, stack);
+            dependency.get(0)
+                    .srcSubpass(VK_SUBPASS_EXTERNAL)
+                    .dstSubpass(0)
+                    .srcStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+                    .srcAccessMask(0)
+                    .dstStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+                    .dstAccessMask(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
             VkRenderPassCreateInfo rpInfo = VkRenderPassCreateInfo.calloc(stack)
                     .sType(VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO)
                     .pAttachments(attachment)
-                    .pSubpasses(subpass);
+                    .pSubpasses(subpass)
+                    .pDependencies(dependency);
             LongBuffer pRenderPass = stack.mallocLong(1);
             check(vkCreateRenderPass(device(), rpInfo, null, pRenderPass), "vkCreateRenderPass");
             renderPass = pRenderPass.get(0);
@@ -567,6 +582,11 @@ final class VkInteropRenderer {
         if (device == null) {
             ready = false;
             return;
+        }
+        // The last submitted frame may still be executing; its command buffer
+        // and everything it references must outlive it.
+        if (fence != 0) {
+            vkWaitForFences(device, fence, true, 1_000_000_000L);
         }
         vkDestroyFence(device, fence, null);
         fence = 0;
