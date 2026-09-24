@@ -782,7 +782,10 @@ float sunShadow(vec3 normal) {
     // than smooth, but it costs nothing: still one ray. A second ray would
     // cost as much again as the whole effect does.
     vec3 direction = frame.sun.xyz;
-    float spread = frame.sunParams.z;
+    // Not in the water pass. The opaque frame is averaged over frames later,
+    // which is what turns this pattern into a soft edge; the translucent pass
+    // never is, so there the same pattern stays on screen as grain.
+    float spread = BLEND ? 0.0 : frame.sunParams.z;
     if (spread > 0.0) {
         vec3 tangent = normalize(cross(direction,
                 abs(direction.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
@@ -833,7 +836,8 @@ float lightBlocked(vec3 normal, vec3 toSource, float distance) {
     // aim at a different spot on the flame for every pixel and a distant
     // shadow's border spreads while a contact shadow's stays tight.
     vec3 target = toSource;
-    float radius = frame.lightShadow.x;
+    // Held still in the water pass, for the reason sunShadow gives.
+    float radius = BLEND ? 0.0 : frame.lightShadow.x;
     if (radius > 0.0) {
         vec3 tangent = normalize(cross(direction,
                 abs(direction.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
@@ -1142,6 +1146,26 @@ float distanceOf(float depth) {
     return 2.0 * n * f / (f + n - (2.0 * depth - 1.0) * (f - n));
 }
 
+/**
+ * The opaque frame under the water, as the water pass sees it.
+ *
+ * That copy is the raw frame: its traced shadow edges and leaf dapple are
+ * dithered per pixel and only averaged later, in OpenGL, into a target this
+ * pass never reads. Refracted or reflected as it is, that dither lands on the
+ * water as grain. Four diagonal taps a texel out cancel most of it; the
+ * sampler is linear, so each tap is itself a small average.
+ */
+vec3 sceneColorAt(vec2 uv) {
+#ifdef RAY_QUERY
+    return 0.25 * (textureLodOffset(sceneColor, uv, 0.0, ivec2(-1, -1)).rgb
+                 + textureLodOffset(sceneColor, uv, 0.0, ivec2( 1, -1)).rgb
+                 + textureLodOffset(sceneColor, uv, 0.0, ivec2(-1,  1)).rgb
+                 + textureLodOffset(sceneColor, uv, 0.0, ivec2( 1,  1)).rgb);
+#else
+    return textureLod(sceneColor, uv, 0.0).rgb;
+#endif
+}
+
 vec4 traceReflection(vec3 origin, vec3 dir) {
     // Away from the surface before the first step, or the surface finds itself.
     float t = 0.3;
@@ -1182,18 +1206,22 @@ vec4 traceReflection(vec3 origin, vec3 dir) {
             // along the edge of the screen would announce how it was made.
             // Behind it, but by how much. A ray that is a long way past the
             // surface never touched it — it went by, somewhere out of sight.
-            if (distanceOf(onScreen.z) - distanceOf(textureLod(sceneDepth, onScreen.xy, 0.0).r)
-                    > REFLECT_THICKNESS) {
+            float behindBy = distanceOf(onScreen.z)
+                    - distanceOf(textureLod(sceneDepth, onScreen.xy, 0.0).r);
+            if (behindBy > REFLECT_THICKNESS) {
                 return vec4(0.0);
             }
+            // Let go gradually rather than at one depth, or moving waves flip
+            // neighbouring pixels between the object and the sky.
+            float thick = 1.0 - smoothstep(0.5 * REFLECT_THICKNESS, REFLECT_THICKNESS, behindBy);
             vec2 edge = smoothstep(vec2(0.0), vec2(0.14), onScreen.xy)
                       * smoothstep(vec2(0.0), vec2(0.14), vec2(1.0) - onScreen.xy);
             // And believed less the further it had to go, all the way to
             // nothing at the end of its rope.
             float reach = t / REFLECT_REACH;
             float trust = clamp(1.0 - reach * reach, 0.0, 1.0);
-            return vec4(textureLod(sceneColor, onScreen.xy, 0.0).rgb,
-                        edge.x * edge.y * trust);
+            return vec4(sceneColorAt(onScreen.xy),
+                        edge.x * edge.y * trust * thick);
         }
         lastMiss = t;
         t += step;
@@ -1436,6 +1464,14 @@ void main() {
     if (frame.water.x > 0.0 && material == MATERIAL_WATER && normal.y > 0.9) {
         vec3 still = normal;
         vec2 g = waveGradient(waveXZ(), frame.frameInfo.x);
+        // Faded out where a wave is too small on screen to be a wave. Roughly
+        // how many blocks one pixel covers on the water: distance squared over
+        // the height it is seen from, times a pixel's angle. Once the shortest
+        // wave (about five blocks) spans fewer than two or three pixels, one
+        // sample of it is aliasing, and it sparkles in the sun's path.
+        float footprint = dot(vRelative, vRelative)
+                / max(abs(vRelative.y), 0.05) * (1.0 / 800.0);
+        g *= 1.0 - smoothstep(1.0, 2.5, footprint);
         vec2 slope = g * (WAVE_SLOPE * frame.water.x);
         normal = normalize(vec3(-slope.x, 1.0, -slope.y));
         // The reflection is measured against a calmer surface than the light is,
@@ -1791,7 +1827,7 @@ void main() {
                     behindDepth = textureLod(sceneDepth, uv, 0.0).r;
 #endif
                 }
-                vec3 behind = textureLod(sceneColor, shifted, 0.0).rgb;
+                vec3 behind = sceneColorAt(shifted);
                 // The bed, banded by the surface above it.
                 //
                 // Not a second pattern: `normal` is the wave normal by this
@@ -1956,7 +1992,11 @@ void main() {
                 // single creature, so a villager standing in the shallows was
                 // being painted a third of the way towards the sand it is
                 // standing on, however far the opacity was let down for it.
-                vec3 refracted = shaded * alpha + behind * (1.0 - alpha);
+                // The water's own tint thins out over the last half block of
+                // depth, so a shore has no hard line of tint; the foam still
+                // marks it.
+                float edgeAlpha = alpha * smoothstep(0.0, 0.5, through);
+                vec3 refracted = shaded * edgeAlpha + behind * (1.0 - edgeAlpha);
                 shaded = mix(shaded, refracted, trustBehind);
                 alpha = mix(alpha, 1.0, trustBehind);
 #endif
