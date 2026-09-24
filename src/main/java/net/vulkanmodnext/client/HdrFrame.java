@@ -120,6 +120,13 @@ public final class HdrFrame {
             return;
         }
         boolean want = VulkanConfig.isHdrFrame() && !refused && resolveWillRun();
+        if (!want && !active) {
+            // Nothing asked for and nothing of ours to undo: the frame is the
+            // game's own eight bits. Not asking the driver keeps a texture
+            // query out of translation layers (gl4es on a phone) that answer
+            // it poorly, on the machines where this can never be wanted.
+            return;
+        }
         boolean is;
         if (frame.framebufferTexture == knownTexture
                 && frame.framebufferTextureWidth == knownWidth
