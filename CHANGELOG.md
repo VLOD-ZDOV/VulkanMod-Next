@@ -2,6 +2,73 @@
 
 ## [Unreleased]
 
+## [0.10.0-alpha.5]
+
+The fifth alpha. A sweep of the code for bugs and for comments that no longer
+said what the code does, then the three things reported from playing it: pale
+shadows beside plants, grain on water, and traced shadows that did not sit
+under what cast them. None of it has been flown yet — report against it.
+
+- **No pale shadow beside grass and blocks.** The cloud-shadow march looks
+  towards the sun for a roof, so that a passing cloud does not sweep across
+  the floor of a closed room. Any tuft of tall grass or single block within
+  twelve blocks passed for that roof, and took the cloud's shade off the
+  ground in the object's own sun-shadow: a light patch the shape of a shadow,
+  pointing away from every plant, whenever a cloud went over. A roof now has to
+  be at least two blocks above the point. The blur that smooths the occlusion
+  also stops at a change of depth now, instead of averaging every silhouette
+  into the shaded ground beside it.
+
+- **Calmer, better water.** The water pass no longer jitters its shadow rays —
+  it is never averaged over frames, so the pattern stayed on screen as grain.
+  The picture under the surface is read filtered, so the refraction no longer
+  crawls; waves fade out where they are too small on screen to be anything but
+  sparkle; a reflection lets go of an object gradually instead of flickering
+  between it and the sky; and the water's tint thins out at the shore.
+
+- **Traced shadows sit where they belong.**
+  - Faces were turned towards the player's feet rather than the eye, so the top
+    of the block beside you, a slab or a table was never shadowed, and in third
+    person neither were the walls between the camera and the player.
+  - The ray started far enough off the surface to move the shadow itself — a
+    third of a block at a low sun. The lift is smaller now, and grows with
+    distance instead.
+  - Walls facing north or south were never shadowed at all.
+  - What is near but off screen — a tree behind you, an overhang above the
+    view — now casts, instead of shadows appearing and vanishing as you turn.
+  - Grass and flowers no longer throw the square shadow of their whole quad.
+  - A mob's shadow no longer trails it by a frame of camera movement.
+  - Cloud shadows are measured from the eye, at the height the game draws the
+    clouds.
+
+- **Phones get a playable game instead of a crash.** On Android — PojavLauncher
+  and the launchers built from it — the Vulkan half stands aside whatever the
+  processor, including x86 tablets. The render distance keeps vanilla's ceiling
+  there rather than 64, which a phone's heap cannot hold, and the background
+  frame cap no longer trusts the launcher's idea of window focus.
+
+- **Fixes found by reading the code.**
+  - Bloom's fall-back to eight-bit targets never took effect; one failure path
+    left half-built targets behind. Bloom also stopped masking by a stale
+    occlusion when whole-scene occlusion is on.
+  - Ray-traced chunk structures were rebuilt every frame, and a stale top-level
+    structure could be traced after the chunks it named were freed.
+  - The opaque pass could clear depth while OpenGL was still reading the last
+    frame; the material buffer's fill raced its copy.
+  - Reset left sky gradient, scene occlusion and leaf shadows on; Group Quad
+    Facings had no row in the settings screen; presets and profiles did not
+    apply VSync until a restart; the Update button covered Done; fifteen
+    screen strings could not be translated.
+  - Boss fog was being scaled; turning the camera delayed the chunk search by
+    up to 50 ms; block light sources ignored the "moved two blocks" trigger;
+    entity parts could be composed one level too shallow.
+  - A notice that Vulkan never came up was wiped before it could be read.
+  - `glslangValidator` was handed a flag it does not have when building the
+    ray-query shader.
+  - Around forty comments corrected to say what the code does.
+
+## [0.10.0-alpha.4]
+
 - **The mod is called VulkanMod Next.** The old name had stopped being true:
   the same renderer is now being brought to newer versions of the game, and
   they live in the same repository. The mod id, the settings file and
