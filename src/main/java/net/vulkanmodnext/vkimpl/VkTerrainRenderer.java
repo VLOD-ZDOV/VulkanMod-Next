@@ -8541,10 +8541,27 @@ final class VkTerrainRenderer {
                 .pColorAttachments(colorRef)
                 .pDepthStencilAttachment(depthRef);
 
+        // Chains the layout changes and the clears onto the submit's semaphore
+        // wait. The implicit dependency starts at the top of the pipe, which
+        // the wait does not cover, so without this the images could be
+        // repacked while OpenGL is still reading the last frame out of them.
+        VkSubpassDependency.Buffer dependency = VkSubpassDependency.calloc(1, stack);
+        dependency.get(0)
+                .srcSubpass(VK_SUBPASS_EXTERNAL)
+                .dstSubpass(0)
+                .srcStageMask(VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+                        | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+                .srcAccessMask(0)
+                .dstStageMask(VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+                        | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+                .dstAccessMask(VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+                        | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
         VkRenderPassCreateInfo rpInfo = VkRenderPassCreateInfo.calloc(stack)
                 .sType(VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO)
                 .pAttachments(attachments)
-                .pSubpasses(subpass);
+                .pSubpasses(subpass)
+                .pDependencies(dependency);
         LongBuffer pRenderPass = stack.mallocLong(1);
         check(vkCreateRenderPass(device(), rpInfo, null, pRenderPass), "vkCreateRenderPass(terrain)");
         renderPass = pRenderPass.get(0);

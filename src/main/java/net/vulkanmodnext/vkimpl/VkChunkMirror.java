@@ -1300,11 +1300,14 @@ final class VkChunkMirror {
      * than it would run on into the builder region.
      */
     private void ensureStagingRing(int needed) {
-        if (stagingCapacity - stagingCapacity / 2 >= needed && stagingBuffer != 0) {
+        // Rounded the way allocateStagingRange rounds it, or a request just
+        // under half the ring would pass here and overrun there.
+        long aligned = (needed + 15L) & ~15L;
+        if (stagingCapacity - stagingCapacity / 2 >= aligned && stagingBuffer != 0) {
             return;
         }
         long capacity = Math.max(STAGING_RING_MIN, stagingCapacity == 0 ? STAGING_RING_MIN : stagingCapacity);
-        while (capacity - capacity / 2 < needed) {
+        while (capacity - capacity / 2 < aligned) {
             capacity *= 2;
         }
         if (stagingBuffer != 0) {
