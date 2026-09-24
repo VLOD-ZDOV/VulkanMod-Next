@@ -29,6 +29,45 @@ public final class Platform {
     }
 
     /**
+     * What about this machine rules the Vulkan half out, or null when nothing
+     * does. Android first, because that answer holds whatever the processor:
+     * PojavLauncher and its forks also run on 64-bit x86 tablets and
+     * Chromebooks, and there the architecture check alone would let the loader
+     * try desktop Linux libraries against Android's C library.
+     */
+    public static String unsupportedPlatform() {
+        if (android()) {
+            return "Android (" + System.getProperty("os.arch", "unknown") + ")";
+        }
+        return unsupportedArchitecture();
+    }
+
+    /**
+     * Whether the game is running on Android, under PojavLauncher or one of the
+     * launchers built from it.
+     *
+     * Those report {@code os.name} as plain Linux, so the question is asked of
+     * what they cannot hide: the environment PojavLauncher sets up for its JVM,
+     * and the system partition every Android device has and no desktop does.
+     * Each check is only a lookup, and one that is refused counts as no.
+     */
+    public static boolean android() {
+        try {
+            if (System.getenv("POJAV_NATIVEDIR") != null || System.getenv("POJAV_RENDERER") != null) {
+                return true;
+            }
+        } catch (SecurityException ignored) {
+            // Not allowed to look is not evidence either way.
+        }
+        try {
+            return new java.io.File("/system/build.prop").isFile()
+                    || new java.io.File("/system/bin/app_process").exists();
+        } catch (SecurityException ignored) {
+            return false;
+        }
+    }
+
+    /**
      * The processor this build has no Vulkan half for, or null when it does.
      *
      * Permissive on purpose. An unfamiliar name is far more likely to be 64-bit
