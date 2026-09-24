@@ -144,6 +144,7 @@ public final class SettingsHealth {
             appendTerrainEffects(names);
             appendTracedEffects(names);
             if (names.length() > 0) {
+                separate(out);
                 out.append(names).append(" — ").append(why);
             }
         } else if (tracingActive()) {
@@ -162,6 +163,7 @@ public final class SettingsHealth {
             add(names, "water caustics", VulkanConfig.getWaterCaustics());
             add(names, "water depth and shore foam", VulkanConfig.getWaterRefraction());
             if (names.length() > 0) {
+                separate(out);
                 out.append(names).append(" — these are left out of the traced "
                         + "terrain shader on purpose, and ray tracing is on");
             }
@@ -178,6 +180,7 @@ public final class SettingsHealth {
             StringBuilder names = new StringBuilder();
             appendTracedEffects(names);
             if (names.length() > 0) {
+                separate(out);
                 out.append(names).append(" — ").append(tracingReason());
             }
         }
@@ -314,9 +317,17 @@ public final class SettingsHealth {
         add(out, "bloom", VulkanConfig.getBloom());
         add(out, "scene tone", VulkanConfig.getSceneTone());
         add(out, "ambient occlusion", VulkanConfig.getAmbientOcclusion());
-        add(out, "directional block light", VulkanConfig.getDirectionalLight());
+        // These two are modifiers that ship above zero — fifty and sixty — and
+        // listing them on their own value named them in every warning of every
+        // install whose renderer was off. Each is only switched on in any sense
+        // that matters while the thing it modifies is.
+        add(out, "directional block light",
+                VulkanConfig.isDynamicLights() && VulkanConfig.getDirectionalLight() > 0);
         add(out, "height fog", VulkanConfig.getHeightFog());
-        add(out, "frame accumulation", VulkanConfig.getTemporalAccumulation());
+        StringBuilder traced = new StringBuilder();
+        appendTracedEffects(traced);
+        add(out, "frame accumulation",
+                VulkanConfig.getTemporalAccumulation() > 0 && traced.length() > 0);
         // Not a shader effect, and it belongs here all the same: the sources
         // are collected inside the Vulkan draw and nowhere else, so with the
         // renderer off nothing is ever gathered and the entity, particle and
@@ -380,9 +391,20 @@ public final class SettingsHealth {
      */
     private static void appendTracedEffects(StringBuilder out) {
         add(out, "sun shadows", VulkanConfig.getSunShadows());
-        add(out, "traced light shadows", VulkanConfig.getTracedLights());
+        // Ships at two, and traces nothing but the moving lights: without
+        // dynamic lights it has nothing to ask about, and counting it on its
+        // own value warned about it on every fresh install.
+        add(out, "traced light shadows",
+                VulkanConfig.isDynamicLights() && VulkanConfig.getTracedLights() > 0);
         add(out, "traced block light", VulkanConfig.getTracedBlockLight());
         add(out, "light through leaves", VulkanConfig.getLeafShadows());
+    }
+
+    /** The same "; " every other cause in the sentence is joined with. */
+    private static void separate(StringBuilder out) {
+        if (out.length() > 0) {
+            out.append("; ");
+        }
     }
 
     private static void add(StringBuilder out, String name, int strength) {

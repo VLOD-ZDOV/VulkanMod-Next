@@ -142,13 +142,17 @@ public final class GuiVulkanSettings extends GuiScreen {
         // there and greyed out the rest of the time would be a promise of news
         // on every screen that has none.
         String newer = UpdateCheck.newerVersion();
+        // Done gives up a third of its width when the update button is there:
+        // at 150 it reached to width / 2 + 100 and the update button, starting
+        // at + 54, was drawn over its right end.
+        int doneWidth = newer != null ? 100 : 150;
         if (newer != null) {
-            this.buttonList.add(new GuiButton(UPDATE, this.width / 2 + 56, this.height - 27, 98, 20,
+            this.buttonList.add(new GuiButton(UPDATE, this.width / 2 + 54, this.height - 27, 98, 20,
                     Lang.tr(Lang.UI, "Get") + " " + newer));
         }
         this.buttonList.add(new GuiButton(RESET, this.width / 2 - 154, this.height - 27, 100, 20,
                 Lang.tr(Lang.UI, "Reset")));
-        this.buttonList.add(new GuiButton(DONE, this.width / 2 - 50, this.height - 27, 150, 20,
+        this.buttonList.add(new GuiButton(DONE, this.width / 2 - 50, this.height - 27, doneWidth, 20,
                 I18n.format("gui.done")));
         updateTabHighlight();
         clampScroll();
@@ -159,8 +163,11 @@ public final class GuiVulkanSettings extends GuiScreen {
             GuiButton button = (GuiButton) entry;
             if (button.id >= PAGE_BUTTON_BASE) {
                 // Vanilla buttons have no selected state; the current tab is
-                // the disabled one, which reads as "pressed".
-                button.enabled = button.id - PAGE_BUTTON_BASE != this.currentPage;
+                // the disabled one, which reads as "pressed". Not while search
+                // results are up, the same rule refreshSearch applies — or a
+                // resize with a search typed greys out a tab that is not shown.
+                button.enabled = this.searchPage != null
+                        || button.id - PAGE_BUTTON_BASE != this.currentPage;
             }
         }
     }

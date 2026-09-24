@@ -177,8 +177,8 @@ public final class GuiVulkanPatches extends GuiScreen {
     }
 
     /**
-     * The three lines under the list: what the selected group is, what turning
-     * it off costs, and what it said if it failed.
+     * The lines under the list, two at most: what turning the selected group
+     * off costs, or what it said if it failed.
      */
     private void drawFoot(int bottom) {
         if (this.selected == null) {

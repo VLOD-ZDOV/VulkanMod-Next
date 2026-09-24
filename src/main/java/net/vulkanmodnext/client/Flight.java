@@ -395,14 +395,6 @@ public final class Flight {
     }
 
     /**
-     * Loads a named preset, if one was asked for.
-     *
-     * Applied after the world is there rather than at startup, because two of
-     * these presets read the machine they are on — how many cores there are to
-     * build chunks with, how much memory the card admits to — and one of them
-     * moves the game's own video settings.
-     */
-    /**
      * Resizes the window, if one was asked for, before anything is measured.
      *
      * The game is told about the change the same way it would be told about a
@@ -439,6 +431,14 @@ public final class Flight {
         }
     }
 
+    /**
+     * Loads a named preset, if one was asked for.
+     *
+     * Applied after the world is there rather than at startup, because two of
+     * these presets read the machine they are on — how many cores there are to
+     * build chunks with, how much memory the card admits to — and one of them
+     * moves the game's own video settings.
+     */
     private static void applyPreset(Minecraft mc) {
         if (PRESET.isEmpty()) {
             return;
@@ -617,9 +617,11 @@ public final class Flight {
         }
         String name = pendingShot;
         // The same frame again on the very next one, when asked. A camera
-        // turning at eighteen degrees a second moves a twentieth of a degree
-        // between two frames, so a pair that differs by more than a rounding
-        // error says the picture being read is not the picture just drawn —
+        // turning at twelve degrees a second — one turn over the default
+        // thirty-second spin — moves a twentieth of a degree between two
+        // frames at a couple of hundred a second, so a pair that differs by
+        // more than a rounding error says the picture being read is not the
+        // picture just drawn —
         // which is the one thing that cannot be told apart from a fault in the
         // renderer by looking at a single frame.
         if (PAIRS && !name.endsWith("b")) {

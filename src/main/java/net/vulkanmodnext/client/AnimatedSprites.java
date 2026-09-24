@@ -42,17 +42,19 @@ import java.util.Map;
  * patch that records them is disabled: the failure is "no saving", never "the
  * world stopped moving".
  *
- * A sprite that no chunk has ever reported is always updated. That is what
- * keeps the item in your hand, the fire on a burning creature and the texture
- * in a menu moving — none of them are terrain, so none of them are in any
- * chunk's record, and a rule that only knew about terrain would freeze them.
- * Fluids are always updated for the same reason and one more: they are what a
- * player looks at when they want to know whether the game is still running.
+ * Anything drawn that is not terrain is vouched for another way. An item
+ * model marks its sprites as it is drawn — in the hand, in a menu, in a frame
+ * or on the ground — and they stay marked for a second or two. Water, lava,
+ * fire and portals are always updated: fluids are drawn by a renderer that
+ * never asks a model, fire burns on creatures as well as on blocks, and they
+ * are what a player looks at when they want to know whether the game is still
+ * running.
  *
- * <p>What remains, and it is why this ships switched off: a texture that is
- * both a block and an item freezes in your hand while no such block is in
- * sight. Holding a block of magma in a world without one placed is the shape
- * of it.
+ * <p>What remains, and it is why this ships switched off: an animated block
+ * texture drawn by something that is neither a chunk nor an item model — a
+ * block entity renderer, a creature, a mod's own geometry — freezes while no
+ * chunk in sight uses it. There is no "never reported by a chunk" rule behind
+ * this; a sprite is updated only for the reasons above.
  */
 public final class AnimatedSprites {
 
@@ -69,8 +71,8 @@ public final class AnimatedSprites {
     private static int words;
 
     /**
-     * Sprites that must be updated whatever is on screen: the ones no chunk
-     * has ever used, and the fluids.
+     * Sprites that must be updated whatever is on screen: water, lava, fire
+     * and portals, matched by name.
      */
     private static long[] always = new long[0];
 
@@ -188,7 +190,12 @@ public final class AnimatedSprites {
         itemsBefore = new long[words];
         gathering = new long[words];
         wanted = new long[words];
-        BY_STATE.clear();
+        // Under its own lock: build threads read and fill this map while the
+        // tick that reindexes runs, and they only ever hold that lock, not
+        // this method's.
+        synchronized (BY_STATE) {
+            BY_STATE.clear();
+        }
         synchronized (BY_ITEM_MODEL) {
             BY_ITEM_MODEL.clear();
         }

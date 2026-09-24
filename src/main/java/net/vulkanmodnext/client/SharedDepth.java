@@ -97,8 +97,15 @@ public final class SharedDepth {
             return;
         }
         // The framebuffer was rebuilt under us: whatever was recorded about the
-        // old one describes an object that no longer exists.
-        if (frame.framebufferObject != knownFramebuffer) {
+        // old one describes an object that no longer exists. A new size means
+        // the same thing — the game resizes by deleting and regenerating the
+        // framebuffer and its depth renderbuffer, and the driver may hand the
+        // framebuffer back under the very name it had, so the name alone does
+        // not say it is new. Keeping the old renderbuffer's name then would
+        // hang a deleted object back up on the way out.
+        if (frame.framebufferObject != knownFramebuffer
+                || frame.framebufferTextureWidth != knownWidth
+                || frame.framebufferTextureHeight != knownHeight) {
             attached = false;
             replacedRenderbuffer = 0;
         }

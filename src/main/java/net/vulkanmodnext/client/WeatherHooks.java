@@ -43,9 +43,6 @@ public final class WeatherHooks {
     }
 
     /**
-     * @return true when Vulkan took this batch and the game must not draw it
-     */
-    /**
      * What the weather pass actually handed over, counted where it happens.
      *
      * Rain went missing with the sky darkening correctly, which says the
@@ -73,6 +70,9 @@ public final class WeatherHooks {
         return line;
     }
 
+    /**
+     * @return true when Vulkan took this batch and the game must not draw it
+     */
     public static boolean take(Tessellator tessellator) {
         passes++;
         vertices += tessellator.getBuffer().getVertexCount();

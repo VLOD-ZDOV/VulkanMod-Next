@@ -813,19 +813,10 @@ public final class TerrainHooks {
         }
     }
 
-    /**
-     * Copies the fixed-function fog the game has already configured for this
-     * frame, so the Vulkan terrain fades exactly like everything OpenGL still
-     * draws. Underwater this is the difference between entities turning the
-     * colour of the water and the blocks behind them staying perfectly clear.
-     *
-     * Read from GL rather than recomputed, because the game changes fog for
-     * water, lava, blindness, the void and render distance, and mods add more.
-     */
-    /** The sheet the game draws its clouds from, looked up once. */
     /** The last drift handed over, so the clouds are never told to go back. */
     private static float lastCloudDrift;
 
+    /** The sheet the game draws its clouds from. */
     private static final net.minecraft.util.ResourceLocation CLOUD_SHEET =
             new net.minecraft.util.ResourceLocation("textures/environment/clouds.png");
 
@@ -879,6 +870,15 @@ public final class TerrainHooks {
         bridge.updateClouds(texture, height, drift);
     }
 
+    /**
+     * Copies the fixed-function fog the game has already configured for this
+     * frame, so the Vulkan terrain fades exactly like everything OpenGL still
+     * draws. Underwater this is the difference between entities turning the
+     * colour of the water and the blocks behind them staying perfectly clear.
+     *
+     * Read from GL rather than recomputed, because the game changes fog for
+     * water, lava, blindness, the void and render distance, and mods add more.
+     */
     private static void captureFog() {
         if (!VulkanConfig.isFogEnabled() || !GL11.glIsEnabled(GL11.GL_FOG)) {
             FOG[3] = 0.0f; // mode 0: the shader skips the blend
@@ -943,22 +943,6 @@ public final class TerrainHooks {
     }
 
     /**
-     * Hands this tick's animation frames to the Vulkan copy of the atlas.
-     *
-     * Called when the game has finished stepping its own animations. With no
-     * renderer to send them to they are dropped rather than kept: a session
-     * that never brings Vulkan up would otherwise grow this buffer forever, and
-     * frames that arrive late are of no use to anyone.
-     */
-    /**
-     * Adds the terrain's glow once the game has drawn the rest of the world.
-     *
-     * Late on purpose: at this point the frame holds entities, particles,
-     * weather and water as well as terrain, so a mob in front of a lava lake
-     * is inside the glow rather than pasted over it, and a torch throws light
-     * onto the sky, which is drawn long after this mod's own frame is finished.
-     */
-    /**
      * Whether the passes over the finished picture are going to run at all.
      *
      * Asked from outside because one of those passes is not decoration: with a
@@ -974,6 +958,14 @@ public final class TerrainHooks {
         return bridge != null && VulkanConfig.isTerrainEnabled() && bridge.isSceneToneAvailable();
     }
 
+    /**
+     * Adds the terrain's glow once the game has drawn the rest of the world.
+     *
+     * Late on purpose: at this point the frame holds entities, particles,
+     * weather and water as well as terrain, so a mob in front of a lava lake
+     * is inside the glow rather than pasted over it, and a torch throws light
+     * onto the sky, which is drawn long after this mod's own frame is finished.
+     */
     public static void applySceneBloom() {
         VulkanBridge bridge = liveBridge();
         if (bridge == null || !VulkanConfig.isTerrainEnabled()) {
@@ -1038,6 +1030,14 @@ public final class TerrainHooks {
     private static final boolean ATLAS_ANIMATIONS_OFF =
             "true".equals(System.getProperty("vulkanmodnext.noAtlasAnimations"));
 
+    /**
+     * Hands this tick's animation frames to the Vulkan copy of the atlas.
+     *
+     * Called when the game has finished stepping its own animations. With no
+     * renderer to send them to they are dropped rather than kept: a session
+     * that never brings Vulkan up would otherwise grow this buffer forever, and
+     * frames that arrive late are of no use to anyone.
+     */
     public static void flushAtlasAnimations() {
         VulkanBridge bridge = liveBridge();
         if (bridge == null || ATLAS_ANIMATIONS_OFF || !VulkanConfig.isTerrainEnabled()) {
