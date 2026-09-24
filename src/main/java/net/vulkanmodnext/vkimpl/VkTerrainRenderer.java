@@ -511,6 +511,14 @@ final class VkTerrainRenderer {
     private long lightmapSampler;
     /** Clamped and unfiltered, for the reflection reading the finished frame. */
     private long sceneSampler;
+    /**
+     * The same, filtered, for the scene's colour only. The water's refraction
+     * and reflection read it at offsets that move with the waves, and an
+     * unfiltered read of a moving offset duplicates and skips pixels, which
+     * crawls on a textured bed. Depth stays unfiltered: many drivers cannot
+     * filter a depth format, and a blended depth is not a depth anywhere.
+     */
+    private long sceneColorSampler;
 
     // Atlas / lightmap
     private long atlasImage;
@@ -878,6 +886,11 @@ final class VkTerrainRenderer {
     private int aoBlurTexture;
     private int aoBlurFbo;
     private int aoProgram;
+    /** The smoothing of the occlusion, stopped at depth edges. See aoPass. */
+    private int aoBlurProgram;
+    private int aoBlurInvSize = -1;
+    private int aoBlurStep = -1;
+    private int aoBlurNearFar = -1;
     private int aoInvSize = -1;
     private int aoProjUniform = -1;
     private int aoRadiusUniform = -1;
@@ -2330,6 +2343,12 @@ final class VkTerrainRenderer {
             rayTracing.setCreatureGeometry(spriteVertexBuffers[previous],
                     (long) creatureFirstVertex[previous] * SPRITE_VERTEX_STRIDE,
                     creatureVertexCount[previous]);
+            // Moved by however far the view has come since they were drawn,
+            // or a mob's shadow trails it by one frame of the camera's motion:
+            // a tenth of a block walking, half a block flying.
+            rayTracing.setCreatureShift((float) (creatureViewX[previous] - viewX),
+                    (float) (creatureViewY[previous] - viewY),
+                    (float) (creatureViewZ[previous] - viewZ));
         } else {
             rayTracing.setCreatureGeometry(0L, 0L, 0);
         }
@@ -3428,12 +3447,23 @@ final class VkTerrainRenderer {
      */
     private int[] creatureFirstVertex;
     private int[] creatureVertexCount;
+    /**
+     * Where the view stood when each slot's creatures were drawn. Their
+     * vertices are relative to that point, and the structure is built a frame
+     * later, from a point that has moved on with the camera.
+     */
+    private double[] creatureViewX;
+    private double[] creatureViewY;
+    private double[] creatureViewZ;
     private boolean creatureSpanWarned;
 
     private void noteCreatureSpan(int slot) {
         if (creatureFirstVertex == null || creatureFirstVertex.length != framesInFlight) {
             creatureFirstVertex = new int[framesInFlight];
             creatureVertexCount = new int[framesInFlight];
+            creatureViewX = new double[framesInFlight];
+            creatureViewY = new double[framesInFlight];
+            creatureViewZ = new double[framesInFlight];
         }
         int first = Integer.MAX_VALUE;
         int end = 0;
@@ -3463,6 +3493,9 @@ final class VkTerrainRenderer {
         }
         creatureFirstVertex[slot] = first;
         creatureVertexCount[slot] = total;
+        creatureViewX[slot] = viewWorldX;
+        creatureViewY[slot] = viewWorldY;
+        creatureViewZ[slot] = viewWorldZ;
     }
 
     /** Records this frame's sprite batches into the translucent pass. */
@@ -4485,20 +4518,25 @@ final class VkTerrainRenderer {
             // Smoothed, because sixteen samples of a neighbourhood is a noisy
             // answer to a question whose answer is smooth.
             //
-            // The same blur bloom uses, walking further between its taps. A
-            // blur wide enough for a glow is not wide enough for this: what a
-            // glow needs hidden is the grain of one bright pixel, and what a
-            // corner needs hidden is the grain of sixteen directions, which is
-            // coarser and lives on a larger scale. Widening costs nothing —
-            // the taps stay five and only the distance between them changes.
-            GL20C.glUseProgram(bloomBlurProgram);
-            GL20C.glUniform2f(bloomBlurInvSize, 1.0f / aoWidth, 1.0f / aoHeight);
+            // Not with the blur bloom uses, which it was until the light bands
+            // were traced to it. A glow is meant to spill over edges; this is
+            // not. The ground beside a blade of grass or a block is the most
+            // shaded thing on screen and the upright face next to it the
+            // least, and a blur that cannot tell them apart averages the two
+            // into a pale fringe along every silhouette. This one stops at a
+            // change of depth.
+            GL20C.glUseProgram(aoBlurProgram);
+            GL20C.glUniform2f(aoBlurInvSize, 1.0f / aoWidth, 1.0f / aoHeight);
+            GL20C.glUniform2f(aoBlurNearFar, near, far);
+            GL13C.glActiveTexture(GL13C.GL_TEXTURE1);
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, depthTexture);
+            GL13C.glActiveTexture(GL13C.GL_TEXTURE0);
             GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, aoBlurFbo);
-            GL20C.glUniform2f(bloomBlurStep, AO_BLUR_SPREAD, 0.0f);
+            GL20C.glUniform2f(aoBlurStep, AO_BLUR_SPREAD, 0.0f);
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, aoTexture);
             fullscreenQuad();
             GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, aoFbo);
-            GL20C.glUniform2f(bloomBlurStep, 0.0f, AO_BLUR_SPREAD);
+            GL20C.glUniform2f(aoBlurStep, 0.0f, AO_BLUR_SPREAD);
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, aoBlurTexture);
             fullscreenQuad();
         } finally {
@@ -4622,12 +4660,20 @@ final class VkTerrainRenderer {
         final double cell = 12.0;
         final double sheetCells = 256.0;
         double perBlock = 1.0 / (cell * sheetCells);
-        double baseU = ((viewWorldX + cloudDrift) / cell) / sheetCells;
-        double baseV = ((viewWorldZ / cell) + 0.33) / sheetCells;
+        // From the eye, which is where the shader's positions are measured
+        // from; the render origin is the feet, and using it put the shadow a
+        // block and a half off whenever the sun was not overhead. And the
+        // clouds' underside is a third of a block above the height the world
+        // reports, which is how the game itself draws them.
+        double eyeX = viewWorldX + cameraOffset[0];
+        double eyeY = viewWorldY + cameraOffset[1];
+        double eyeZ = viewWorldZ + cameraOffset[2];
+        double baseU = ((eyeX + cloudDrift) / cell) / sheetCells;
+        double baseV = ((eyeZ / cell) + 0.33) / sheetCells;
         baseU -= Math.floor(baseU);
         baseV -= Math.floor(baseV);
         GL20C.glUniform4f(aoCloudUvUniform, (float) baseU, (float) baseV,
-                (float) perBlock, (float) (cloudHeight - viewWorldY));
+                (float) perBlock, (float) (cloudHeight + 0.33 - eyeY));
         GL20C.glUniform3f(aoSunWorldUniform,
                 sunDirection[0], sunDirection[1], sunDirection[2]);
         modelViewMatrix.clear();
@@ -5063,7 +5109,19 @@ final class VkTerrainRenderer {
                         + "                float kd = texture2D(uSource, kuv).r;\n"
                         + "                if (kd >= 0.9999) continue;\n"
                         + "                float gap2 = -sk.z - linearZ(kd);\n"
-                        + "                if (gap2 > 0.05 && gap2 < 6.0) { cloud = 0.0; break; }\n"
+                        // A roof, not anything at all. Found this way, a tuft
+                        // of tall grass or a block standing beside the point
+                        // counted as a ceiling too, and took the cloud's shade
+                        // off the ground in that object's own sun-shadow — a
+                        // light patch the shape of a shadow, pointing away
+                        // from every plant, whenever a cloud went over. A
+                        // ceiling is at least two blocks above the floor it
+                        // covers; grass and a lone block are not. The window
+                        // behind the surface is narrowed for the same reason:
+                        // six blocks let anything merely standing in front of
+                        // the ray on screen pass for a roof.
+                        + "                float rise = uSunWorld.y * float(k);\n"
+                        + "                if (gap2 > 0.05 && gap2 < 1.5 && rise >= 2.0) { cloud = 0.0; break; }\n"
                         + "            }\n"
                         // Faded out with the sun near the horizon, where the
                         // journey to the cloud layer is long enough that the
@@ -5129,6 +5187,47 @@ final class VkTerrainRenderer {
         int prevAo = GL11C.glGetInteger(GL20C.GL_CURRENT_PROGRAM);
         GL20C.glUseProgram(aoProgram);
         GL20C.glUniform1i(GL20C.glGetUniformLocation(aoProgram, "uClouds"), 2);
+        GL20C.glUseProgram(prevAo);
+
+        // Seven taps along one axis, each weighed by how far it is and by
+        // whether it lies on the same surface as the centre. A tap across a
+        // depth edge — the ground behind a blade of grass, the sky behind a
+        // block — is a different surface with a different answer, and letting
+        // it in is what drew a light band down every silhouette.
+        aoBlurProgram = buildQuadProgram(
+                "uniform sampler2D uSource;\n"
+                        + "uniform sampler2D uDepth;\n"
+                        + "uniform vec2 uInvSize;\n"
+                        + "uniform vec2 uStep;\n"
+                        + "uniform vec2 uNearFar;\n"
+                        + "float linearZ(float d) {\n"
+                        + "    float n = uNearFar.x;\n"
+                        + "    float f = uNearFar.y;\n"
+                        + "    return 2.0 * n * f / (f + n - (2.0 * d - 1.0) * (f - n));\n"
+                        + "}\n"
+                        + "void main() {\n"
+                        + "    vec2 uv = gl_FragCoord.xy * uInvSize;\n"
+                        + "    vec2 d = uStep * uInvSize;\n"
+                        + "    float zc = linearZ(texture2D(uDepth, uv).r);\n"
+                        + "    float tolerance = 0.04 * zc + 0.08;\n"
+                        + "    vec3 sum = vec3(0.0);\n"
+                        + "    float weights = 0.0;\n"
+                        + "    for (int i = -3; i <= 3; i++) {\n"
+                        + "        vec2 q = uv + d * float(i);\n"
+                        + "        float z = linearZ(texture2D(uDepth, q).r);\n"
+                        + "        float w = exp(-float(i * i) / 4.5)\n"
+                        + "                * clamp(1.0 - abs(z - zc) / tolerance, 0.0, 1.0);\n"
+                        + "        sum += texture2D(uSource, q).rgb * w;\n"
+                        + "        weights += w;\n"
+                        + "    }\n"
+                        // The centre always counts, so this is never zero.
+                        + "    gl_FragColor = vec4(sum / weights, 1.0);\n"
+                        + "}\n");
+        aoBlurInvSize = GL20C.glGetUniformLocation(aoBlurProgram, "uInvSize");
+        aoBlurStep = GL20C.glGetUniformLocation(aoBlurProgram, "uStep");
+        aoBlurNearFar = GL20C.glGetUniformLocation(aoBlurProgram, "uNearFar");
+        GL20C.glUseProgram(aoBlurProgram);
+        GL20C.glUniform1i(GL20C.glGetUniformLocation(aoBlurProgram, "uDepth"), 1);
         GL20C.glUseProgram(prevAo);
     }
 
@@ -5607,7 +5706,11 @@ final class VkTerrainRenderer {
         // The reference has to be what the frame actually received, occlusion
         // and all, or the comparison that decides whether a light is covered
         // would fail everywhere and the glow would vanish.
-        GL20C.glUniform1f(bloomMaskAoUniform, aoStrength > 0.0f && !aoFailed ? 1.0f : 0.0f);
+        // With whole-scene occlusion the composite applies none (it is darkened
+        // later, from a different pass), and the texture then holds the
+        // previous frame's scene occlusion, so it is left out of the reference.
+        GL20C.glUniform1f(bloomMaskAoUniform,
+                aoStrength > 0.0f && !aoFailed && !sceneOcclusion ? 1.0f : 0.0f);
         GL13C.glActiveTexture(GL13C.GL_TEXTURE1);
         GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, aoTexture);
         // The same picture the composite drew, or the comparison that decides
@@ -7548,6 +7651,10 @@ final class VkTerrainRenderer {
         check(vkCreateSampler(device(), sceneSamplerInfo, null, pSceneSampler),
                 "vkCreateSampler(scene)");
         sceneSampler = pSceneSampler.get(0);
+        sceneSamplerInfo.magFilter(VK_FILTER_LINEAR).minFilter(VK_FILTER_LINEAR);
+        check(vkCreateSampler(device(), sceneSamplerInfo, null, pSceneSampler),
+                "vkCreateSampler(scene colour)");
+        sceneColorSampler = pSceneSampler.get(0);
 
         createFrameUniforms(stack);
 
@@ -7978,6 +8085,12 @@ final class VkTerrainRenderer {
                 colourFormat == VK_FORMAT_R16G16B16A16_SFLOAT ? 1.0f : 0.0f);
         // How brightly a leaf lets the sun through from behind it.
         MemoryUtil.memPutFloat(base + 1020, leafGlow);
+        // Where the eye is from the point the geometry is offset from, so the
+        // shader can turn a face towards the camera rather than the feet.
+        MemoryUtil.memPutFloat(base + 1024, cameraOffset[0]);
+        MemoryUtil.memPutFloat(base + 1028, cameraOffset[1]);
+        MemoryUtil.memPutFloat(base + 1032, cameraOffset[2]);
+        MemoryUtil.memPutFloat(base + 1036, 0.0f);
     }
 
     /**
@@ -8377,7 +8490,7 @@ final class VkTerrainRenderer {
             VkDescriptorImageInfo.Buffer sceneColorInfo = VkDescriptorImageInfo.calloc(1, stack);
             boolean sceneReady = colorView != 0 && depthView != 0 && sceneWanted();
             sceneColorInfo.get(0)
-                    .sampler(sceneSampler)
+                    .sampler(sceneColorSampler)
                     .imageView(sceneReady ? colorView : atlasView)
                     .imageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             VkDescriptorImageInfo.Buffer sceneDepthInfo = VkDescriptorImageInfo.calloc(1, stack);
@@ -10904,6 +11017,10 @@ final class VkTerrainRenderer {
         }
         vkDestroyRenderPass(device(), renderPass, null);
         vkDestroyDescriptorPool(device(), descriptorPool, null);
+        if (sceneColorSampler != 0) {
+            vkDestroySampler(device(), sceneColorSampler, null);
+            sceneColorSampler = 0;
+        }
         if (sceneSampler != 0) {
             vkDestroySampler(device(), sceneSampler, null);
             sceneSampler = 0;
