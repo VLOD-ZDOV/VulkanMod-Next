@@ -244,7 +244,7 @@ public class VulkanCorePlugin implements IFMLLoadingPlugin, IEarlyMixinLoader {
             out.write("# It is for renderers that came out after this build did. These are\n");
             out.write("# already known and do not need a line: optifine, shadersmod,\n");
             out.write("# celeritas, actinium, nothirium, vulcanizator, vintagium, relictium,\n");
-            out.write("# neonium, magnesium.\n");
+            out.write("# neonium.\n");
             out.write("#\n");
             out.write("# Anything after a # is ignored. Blank lines are ignored.\n");
             out.write("# To go the other way and load this renderer anyway, start the game\n");

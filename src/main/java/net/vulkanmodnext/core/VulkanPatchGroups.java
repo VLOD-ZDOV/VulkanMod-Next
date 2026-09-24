@@ -16,7 +16,7 @@ import java.util.Map;
  * later attempt to load that class reports it as missing — so a broken patch on
  * {@code RenderGlobal} surfaces as {@code NoClassDefFoundError:
  * net/minecraft/client/renderer/RenderGlobal}, naming neither the patch nor the
- * mod that wrote it. Eleven of the patches below aim at that one class, and so
+ * mod that wrote it. Twelve of the patches below aim at that one class, and so
  * do Alfheim, VintageFix and LoliASM. Whoever loses that argument, the message
  * on screen is the same and points at nobody.
  *
