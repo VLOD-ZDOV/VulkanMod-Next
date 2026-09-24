@@ -20,9 +20,9 @@ import org.apache.logging.log4j.Logger;
  * side of every block, and reported 24 ns a block. Two calls to
  * {@code System.nanoTime} cost about that between them on their own: the
  * measurement was most of what it measured, and no conclusion could be drawn
- * about the work. A whole chunk is forty thousand block positions, so one
- * clock pair around the rebuild is four orders of magnitude cheaper per block
- * and reports the same total.
+ * about the work. A chunk section is four thousand block positions (16 cubed),
+ * so one clock pair around the rebuild is three orders of magnitude cheaper
+ * per block and reports the same total.
  *
  * That also makes the number the useful one. Nobody wants to know what a
  * hashmap lookup costs; the question is whether a chunk takes longer to build

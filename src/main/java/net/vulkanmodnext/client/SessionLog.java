@@ -144,6 +144,8 @@ public final class SessionLog {
             // A held hour belongs to the world it was held in. Carrying it into
             // the next one would freeze a new world at a time it never had.
             WorldDisplay.forget();
+            // Camera-relative positions from the world just left.
+            BlockLightSources.forget();
             Diagnostics.flushNow("world loaded, dimension " + event.getWorld().provider.getDimension()
                     + ", render distance " + Minecraft.getMinecraft().gameSettings.renderDistanceChunks);
         }

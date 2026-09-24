@@ -84,10 +84,12 @@ public final class MaterialSprites {
             } catch (Throwable t) {
                 continue;
             }
-            if (sprite == null || sprite.getMinU() == sprite.getMaxU()) {
+            if (sprite == null || !NAMES[i].equals(sprite.getIconName())
+                    || sprite.getMinU() == sprite.getMaxU()) {
                 // Missing sprites come back as the "missing texture" one, which
                 // every unknown name shares. Sending it would paint everything
-                // that failed to load as water.
+                // that failed to load as water. It is a real rectangle in the
+                // atlas, so only its name gives it away.
                 continue;
             }
             materials[found] = MATERIALS[i];
