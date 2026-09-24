@@ -280,8 +280,10 @@ tasks.register('compileShaders') {
                 cmd.add('--target-env')
                 cmd.add(env)
                 if (rayQuery) {
-                    cmd.add('--target-spv')
-                    cmd.add('spv1.4')
+                    // glslangValidator has no --target-spv; the SPIR-V
+                    // version is a second --target-env.
+                    cmd.add('--target-env')
+                    cmd.add('spirv1.4')
                 }
             }
             cmd.add(input.absolutePath)
