@@ -169,10 +169,10 @@ public final class VulkanLoader {
                         + " -Dvulkanmodnext.javaCeiling=" + java + " — what decides this is the JNI version"
                         + " rather than the Java one, and it moves far more rarely.");
             }
-            String arch = net.vulkanmodnext.core.Platform.unsupportedArchitecture();
-            if (arch != null) {
+            String platform = net.vulkanmodnext.core.Platform.unsupportedPlatform();
+            if (platform != null) {
                 throw new VulkanUnavailableException("This mod ships its Vulkan half with native"
-                        + " libraries for 64-bit x86 only, and this machine is " + arch + ". Nothing"
+                        + " libraries for 64-bit x86 desktops only, and this machine is " + platform + ". Nothing"
                         + " here can load, so the game renders on OpenGL as it always did."
                         + " Phones and tablets running Minecraft Java through a translation layer"
                         + " land here: the world is drawn by that layer, and everything this mod"

@@ -102,10 +102,10 @@ public class VulkanCorePlugin implements IFMLLoadingPlugin, IEarlyMixinLoader {
         // vanilla. That works, and it is a great deal of transformed bytecode
         // to arrive at the picture the game would have drawn anyway — on the
         // one class of device where the game can least afford it.
-        String architecture = Platform.unsupportedArchitecture();
-        if (architecture != null) {
+        String platform = Platform.unsupportedPlatform();
+        if (platform != null) {
             System.out.println("[VulkanModNext] This mod carries its Vulkan renderer for 64-bit x86"
-                    + " only and this machine is " + architecture + ", so the renderer is not"
+                    + " desktops only and this machine is " + platform + ", so the renderer is not"
                     + " loaded and the world is drawn the way it always was. The settings and the"
                     + " game-side optimisations stay available.");
             return configs;
