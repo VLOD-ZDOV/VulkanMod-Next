@@ -54,7 +54,11 @@ public final class MaterialRuns {
     /** Nothing special; the great majority of a world. */
     public static final int PLAIN = 0;
     public static final int WATER = 1;
-    /** Leaves, grass, flowers, crops — anything that should move in wind. */
+    /**
+     * A plant that is lit as foliage but stands still in the wind: sugar cane,
+     * lily pads, cocoa, chorus, and a double plant that cannot say which half
+     * it is. The ones that sway are PLANT, PLANT_TALL_* and LEAVES.
+     */
     public static final int FOLIAGE = 2;
     public static final int GLASS = 3;
     public static final int LAVA = 4;
@@ -110,7 +114,7 @@ public final class MaterialRuns {
      * fragment can see gets that wrong.
      */
     public static final int LIGHT_SHIFT = 4;
-    /** The material itself is 0..6, so four bits is room to spare. */
+    /** The material itself is 0..9, so four bits is enough. */
     public static final int MATERIAL_MASK = 0x0F;
 
     /**
@@ -361,13 +365,13 @@ public final class MaterialRuns {
         // sway. Everything about a cross model is vertical, so the top pair of
         // corners of every quad is its top and moving them is the whole of it.
         //
-        // Two are held back. A plant that spans more than one block — a double
-        // plant, sugar cane — has the top of the lower block and the bottom of
-        // the upper block at the same height, and only the first of the two
-        // would move: the stem would come apart at the seam. Doing that
-        // properly means knowing how far up its own plant a block is, which is
-        // not something a single block state can say.
-        // Both, and this is not tidiness. Vanilla's Material is a table of
+        // A plant that spans more than one block has the top of the lower
+        // block and the bottom of the upper block at the same height, and
+        // moving the top pair of each would part the stem at the seam. A double
+        // plant can say which half it is, so it gets PLANT_TALL_*; sugar cane
+        // cannot, so it stands still (see below).
+        //
+        // PLANTS and VINE both, and this is not tidiness. Vanilla's Material is a table of
         // physical behaviour, not of shape, and in this version ordinary grass,
         // ferns, dead bushes, real vines and two-block plants are all
         // Material.VINE together. Reading that name as "a vine" is what left
@@ -476,7 +480,7 @@ public final class MaterialRuns {
         // work between them — the first version reported 24 ns a block and most
         // of that was the reading of it. What the cost of this actually is has
         // to be read off the whole chunk rebuild, which is what ChunkBuildStats
-        // times, with one clock pair per forty thousand blocks instead of two.
+        // times, with one clock pair per four thousand blocks instead of two.
         return String.format(
                 "material tags: %d blocks recorded, %d chunk layers averaging %.1f runs, "
                         + "%.0f%% of them one plain run; %d layers sent to the renderer, "

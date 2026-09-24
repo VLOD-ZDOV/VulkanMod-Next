@@ -80,6 +80,12 @@ public final class Matrices {
      * caller has nothing useful to do with a made-up answer.
      */
     public static float nearPlane(float[] projection) {
+        // A perspective matrix copies -z into w; an orthographic one leaves
+        // that element at zero, and its planes would divide out to a
+        // plausible-looking number that is not a distance at all.
+        if (projection[2 * 4 + 3] == 0.0f) {
+            return 0.0f;
+        }
         float m10 = projection[2 * 4 + 2];
         float m14 = projection[3 * 4 + 2];
         float denominator = m10 - 1.0f;
@@ -88,6 +94,9 @@ public final class Matrices {
 
     /** The far plane of a perspective projection; see {@link #nearPlane}. */
     public static float farPlane(float[] projection) {
+        if (projection[2 * 4 + 3] == 0.0f) {
+            return 0.0f;
+        }
         float m10 = projection[2 * 4 + 2];
         float m14 = projection[3 * 4 + 2];
         float denominator = m10 + 1.0f;

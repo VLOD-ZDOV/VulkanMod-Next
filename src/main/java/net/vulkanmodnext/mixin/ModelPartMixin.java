@@ -9,18 +9,20 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Watches every model part the game draws, and changes nothing.
+ * Watches every model part the game draws, and takes the ones Vulkan draws.
  *
  * Both ends of the call, because the skeleton nests: a part's children are
  * drawn inside its frame, and without the second hook every sibling would be
  * placed inside its elder brother instead of beside him.
  *
- * Neither is cancellable. This is the point where entities would eventually be
- * taken into Vulkan, and it is also the busiest shared method in the client —
- * every creature, every armour layer, every mod that builds its models the
- * ordinary way passes through here. A hook that only looks cannot break a mod
- * that does something unusual, because that mod goes on drawing exactly as it
- * did.
+ * Only the head is cancellable, and it cancels only when
+ * {@code EntityGeometry.takePart} has taken the part — and with it every child
+ * — into Vulkan. This is the busiest shared method in the client — every
+ * creature, every armour layer, every mod that builds its models the ordinary
+ * way passes through here — so whenever the part is not taken the hook only
+ * looks, and a mod that does something unusual goes on drawing exactly as it
+ * did. The return hook is skipped along with a cancelled call, which is
+ * correct: the part was never begun on this side either.
  */
 @Mixin(ModelRenderer.class)
 public abstract class ModelPartMixin {

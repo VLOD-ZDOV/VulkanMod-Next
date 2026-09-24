@@ -7,6 +7,7 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.VkBufferCreateInfo;
 import org.lwjgl.vulkan.VkBufferImageCopy;
+import org.lwjgl.vulkan.VkBufferMemoryBarrier;
 import org.lwjgl.vulkan.VkClearValue;
 import org.lwjgl.vulkan.VkCommandBuffer;
 import org.lwjgl.vulkan.VkCommandBufferAllocateInfo;
@@ -37,6 +38,7 @@ import org.lwjgl.vulkan.VkRenderPassBeginInfo;
 import org.lwjgl.vulkan.VkRenderPassCreateInfo;
 import org.lwjgl.vulkan.VkShaderModuleCreateInfo;
 import org.lwjgl.vulkan.VkSubmitInfo;
+import org.lwjgl.vulkan.VkSubpassDependency;
 import org.lwjgl.vulkan.VkSubpassDescription;
 import org.lwjgl.vulkan.VkViewport;
 import org.lwjgl.vulkan.VkAttachmentDescription;
@@ -173,6 +175,21 @@ final class VkDemoRenderer {
                 .layerCount(1);
         vkCmdCopyImageToBuffer(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer, region);
 
+        // A fence wait alone does not make device writes visible to the host;
+        // the copy has to be made available to HOST_READ explicitly.
+        VkBufferMemoryBarrier.Buffer toHost = VkBufferMemoryBarrier.calloc(1, stack);
+        toHost.get(0)
+                .sType(VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER)
+                .srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT)
+                .dstAccessMask(VK_ACCESS_HOST_READ_BIT)
+                .srcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .dstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .buffer(stagingBuffer)
+                .offset(0)
+                .size(VK_WHOLE_SIZE);
+        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                0, null, toHost, null);
+
         check(vkEndCommandBuffer(commandBuffer), "vkEndCommandBuffer");
     }
 
@@ -238,10 +255,23 @@ final class VkDemoRenderer {
                     .colorAttachmentCount(1)
                     .pColorAttachments(colorRef);
 
+            // The implicit external dependency after the pass waits on nothing
+            // (BOTTOM_OF_PIPE, no access), so the copy that reads the image
+            // right after it needs an explicit one against the colour writes.
+            VkSubpassDependency.Buffer dependency = VkSubpassDependency.calloc(1, stack);
+            dependency.get(0)
+                    .srcSubpass(0)
+                    .dstSubpass(VK_SUBPASS_EXTERNAL)
+                    .srcStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+                    .srcAccessMask(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
+                    .dstStageMask(VK_PIPELINE_STAGE_TRANSFER_BIT)
+                    .dstAccessMask(VK_ACCESS_TRANSFER_READ_BIT);
+
             VkRenderPassCreateInfo rpInfo = VkRenderPassCreateInfo.calloc(stack)
                     .sType(VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO)
                     .pAttachments(attachment)
-                    .pSubpasses(subpass);
+                    .pSubpasses(subpass)
+                    .pDependencies(dependency);
 
             LongBuffer pRenderPass = stack.mallocLong(1);
             check(vkCreateRenderPass(device(), rpInfo, null, pRenderPass), "vkCreateRenderPass");

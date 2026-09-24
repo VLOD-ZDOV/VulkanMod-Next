@@ -31,10 +31,18 @@ public final class BackgroundThrottle {
      */
     private static boolean published;
 
+    /**
+     * Off on Android. There the "window" is a surface the launcher's shim
+     * reports focus for, and a focus that reads as lost while the game is on
+     * screen would hold it at the background cap for the whole session. The
+     * system already stops drawing an app that is not in front.
+     */
+    private static final boolean ANDROID = net.vulkanmodnext.core.Platform.android();
+
     /** Called at the end of every rendered frame. */
     public static void afterFrame() {
         int limit = VulkanConfig.getBackgroundFpsLimit();
-        boolean throttling = limit > 0 && !Display.isActive();
+        boolean throttling = limit > 0 && !ANDROID && !Display.isActive();
         if (throttling != published) {
             published = throttling;
             System.setProperty("vulkanmodnext.frameThrottled", Boolean.toString(throttling));
