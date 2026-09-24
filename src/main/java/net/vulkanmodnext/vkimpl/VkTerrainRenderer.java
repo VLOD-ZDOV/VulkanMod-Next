@@ -481,8 +481,9 @@ final class VkTerrainRenderer {
             new TerrainPipeline("cutout", true, false, true),
             new TerrainPipeline("translucent", false, true, false),
     };
-    /** Index into {@link #TERRAIN_PIPELINES}; also the layer ordinal vanilla uses. */
+    /** Vanilla's ordinal for the translucent layer. */
     private static final int LAYER_TRANSLUCENT = 3;
+    /** Index into {@link #TERRAIN_PIPELINES}. */
     private static final int PIPELINE_TRANSLUCENT = 2;
     /** Vanilla's second opaque layer: leaves, and what casts a canopy's shadow. */
     private static final int LAYER_CUTOUT_MIPPED = 1;
@@ -1314,8 +1315,9 @@ final class VkTerrainRenderer {
     /**
      * Releases the shared colour and depth images to OpenGL, or takes them back.
      *
-     * Both sit in SHADER_READ_ONLY_OPTIMAL between frames, which is where the
-     * render pass leaves them and what the composite samples. The layout does
+     * Both sit in {@link #sharedLayout()} and {@link #sharedDepthLayout()}
+     * between frames, which is where the render pass leaves them and what the
+     * composite samples. The layout does
      * not move here — only the ownership does, and the pair has to match: a
      * release without its acquire leaves the next frame writing to an image it
      * does not hold.
@@ -1903,6 +1905,11 @@ final class VkTerrainRenderer {
             if (frameOpen || colorImage == 0) {
                 return false;
             }
+            // Its draws come out of the same batch, which is sized from this
+            // on the next frame's first layer.
+            if (chunkCount > peakDrawsNeeded) {
+                peakDrawsNeeded = chunkCount;
+            }
             long t = System.nanoTime();
             long waitBefore = translucentWaitNanos;
             boolean taken = renderTranslucent(chunks, chunkCount, mvp, viewX, viewY, viewZ, mirror);
@@ -2315,8 +2322,10 @@ final class VkTerrainRenderer {
         // are the previous frame's: this runs on the first layer of the frame
         // and they are not drawn until the last. Their slot is not the one
         // being written now, so the geometry is still there to be read.
+        // With one frame in flight the previous slot is this one, which the
+        // sprite pass rewrites later this frame while the build still reads it.
         int previous = (activeFrameSlot + framesInFlight - 1) % framesInFlight;
-        if (creatureVertexCount != null && creatureVertexCount[previous] > 0
+        if (framesInFlight > 1 && creatureVertexCount != null && creatureVertexCount[previous] > 0
                 && spriteVertexBuffers != null && spriteVertexBuffers[previous] != 0) {
             rayTracing.setCreatureGeometry(spriteVertexBuffers[previous],
                     (long) creatureFirstVertex[previous] * SPRITE_VERTEX_STRIDE,
@@ -2909,8 +2918,8 @@ final class VkTerrainRenderer {
                 // lie inside that span, and a camera above all of them sees the
                 // underside of none — the card would work that out too, but only
                 // after fetching every one of those vertices, and fetching is
-                // what this pass is bound by. Both ends can never go at once,
-                // and geometry that was never grouped has zero at both.
+                // what this pass is bound by. Geometry that was never grouped
+                // has zero at both ends.
                 int quadCount = vertexCount / 4;
                 int begin = 0;
                 int end = quadCount;
@@ -3107,12 +3116,14 @@ final class VkTerrainRenderer {
         frameSignalled = true;
         try (MemoryStack stack = stackPush()) {
             vkCmdEndRenderPass(commandBuffer);
-            // Handed to OpenGL as the last thing this frame records, so the
-            // composite that follows reads images Vulkan no longer owns.
-            transferSharedImages(stack, commandBuffer, true);
+            // The readback copies out of the colour image, so it has to be
+            // recorded while this queue still owns it.
             if (STARTUP_READBACK && (frameCounter == 0 || frameCounter == 119)) {
                 recordColorReadback(stack);
             }
+            // Handed to OpenGL as the last thing this frame records, so the
+            // composite that follows reads images Vulkan no longer owns.
+            transferSharedImages(stack, commandBuffer, true);
             if (timestampsSupported) {
                 vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                         queryPool, activeFrameSlot * 4 + 1);
@@ -3130,9 +3141,13 @@ final class VkTerrainRenderer {
                 signalFenceValue++;
             }
             if (!firstFrame && SHARED_SEMAPHORES) {
+                // The depth clear runs at the early fragment tests, ahead of
+                // colour output: a wait at colour output alone would let it
+                // land while OpenGL is still reading the last frame's depth.
                 submit.waitSemaphoreCount(1)
                         .pWaitSemaphores(stack.longs(vkWaitSemaphore))
-                        .pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT));
+                        .pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+                                | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT));
             }
             firstFrame = false;
             firstFrameStage("submitting the opaque frame");
@@ -3696,7 +3711,9 @@ final class VkTerrainRenderer {
      * the caller is expected to keep asking rather than to ask once.
      */
     synchronized int sharedDepthTextureForGame(int wantedWidth, int wantedHeight) {
-        if (!SHARED_DEPTH_WANTED || !baseReady || glDepthTexture == -1) {
+        // Not without semaphores: handing depth back and forth is a semaphore
+        // signal each way, and with them off nothing waits on either.
+        if (!SHARED_DEPTH_WANTED || !SHARED_SEMAPHORES || !baseReady || glDepthTexture == -1) {
             return 0;
         }
         // A target of the wrong size is worse than no offer: a framebuffer whose
@@ -4400,7 +4417,7 @@ final class VkTerrainRenderer {
      * back from a depth and the two numbers the projection is made of; the
      * surface's direction comes from how that position changes across the
      * screen, which is exact here because every face of a block is flat. Then
-     * eight neighbours are asked whether they stand in front of the surface,
+     * sixteen neighbours are asked whether they stand in front of the surface,
      * and how much they do is the answer.
      *
      * Run inside the composite, while the depth image is still this renderer's
@@ -5018,8 +5035,8 @@ final class VkTerrainRenderer {
                         // hundreds of blocks away in the sky and says nothing
                         // about what stands between. Without this the shade of
                         // passing clouds swept across the floor of a closed
-                        // house. Six steps of two blocks towards the sun is
-                        // enough to find a ceiling and cheap enough to spend:
+                        // house. A short march towards the sun is enough to
+                        // find a ceiling and cheap enough to spend:
                         // it is the same march the contact shadows do, walked
                         // further and asked a coarser question.
                         + "            vec3 up = rayStart;\n"
@@ -5790,8 +5807,8 @@ final class VkTerrainRenderer {
                 GL30C.glBlitFramebuffer(0, 0, width, height, 0, 0, width, height,
                         GL11C.GL_COLOR_BUFFER_BIT, GL11C.GL_NEAREST);
                 // Asked as well, and for the harder reason: a refused colour
-                // copy leaves this texture black, and the grading pass writes
-                // what it read back over the whole frame. That is a world that
+                // copy leaves this texture black, and the passes that read it
+                // write what they read back over the whole frame. That is a world that
                 // has gone black with the hand still on top of it — the hand
                 // being drawn after all of this — which reads as the renderer
                 // having failed rather than as one copy having been refused.
@@ -5801,7 +5818,7 @@ final class VkTerrainRenderer {
                     if (error != GL11C.GL_NO_ERROR) {
                         sceneColourUsable = false;
                         LOGGER.warn("The frame's colour would not copy into a texture (GL error"
-                                + " 0x{}), so grading and light shafts are off for this session:"
+                                + " 0x{}), so scene occlusion and light shafts are off for this session:"
                                 + " both read that copy, and reading it empty paints the world"
                                 + " black", Integer.toHexString(error));
                     }
@@ -6547,7 +6564,9 @@ final class VkTerrainRenderer {
                 org.lwjgl.opengl.GL15C.glBindBuffer(
                         org.lwjgl.opengl.GL21C.GL_PIXEL_PACK_BUFFER, prevPack);
             }
-            if (readError != GL11C.GL_NO_ERROR || samples > 1 || prevPack != 0) {
+            // A pack buffer was unbound above, so it no longer spoils the read;
+            // it is only named in the message.
+            if (readError != GL11C.GL_NO_ERROR || samples > 1) {
                 return "UNREADABLE (GL error 0x" + Integer.toHexString(readError)
                         + ", " + samples + " samples, pack buffer " + prevPack + ")";
             }
@@ -6970,8 +6989,13 @@ final class VkTerrainRenderer {
         destroyBloomTargets();
         bloomWidth = wantWidth;
         bloomHeight = wantHeight;
+        // A refusal from buildBloomTargets only turns the effect off once the
+        // eight-bit fallback has been refused too; setting bloomFailed there
+        // would make the fallback below build targets nothing ever used.
         if (!buildBloomTargets()) {
             if (!bloomFloat) {
+                LOGGER.error("Bloom targets refused; the effect is off for this session");
+                bloomFailed = true;
                 return false;
             }
             // A driver without float render targets: the reach will suffer,
@@ -6982,6 +7006,7 @@ final class VkTerrainRenderer {
             bloomWidth = wantWidth;
             bloomHeight = wantHeight;
             if (!buildBloomTargets()) {
+                LOGGER.error("Bloom targets refused in eight bits too; the effect is off for this session");
                 bloomFailed = true;
                 return false;
             }
@@ -7009,11 +7034,10 @@ final class VkTerrainRenderer {
             GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER, GL30C.GL_COLOR_ATTACHMENT0,
                     GL11C.GL_TEXTURE_2D, bloomTexture[i], 0);
             if (GL30C.glCheckFramebufferStatus(GL30C.GL_FRAMEBUFFER) != GL30C.GL_FRAMEBUFFER_COMPLETE) {
-                LOGGER.error("Bloom framebuffer incomplete; the effect is off for this session");
+                LOGGER.error("Bloom framebuffer incomplete");
                 GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, prevFbo);
                 GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, prevTexture);
                 destroyBloomTargets();
-                bloomFailed = true;
                 return false;
             }
         }
@@ -7029,11 +7053,10 @@ final class VkTerrainRenderer {
             GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER, GL30C.GL_COLOR_ATTACHMENT0,
                     GL11C.GL_TEXTURE_2D, bloomNearTexture[i], 0);
             if (GL30C.glCheckFramebufferStatus(GL30C.GL_FRAMEBUFFER) != GL30C.GL_FRAMEBUFFER_COMPLETE) {
-                LOGGER.error("Bloom framebuffer incomplete; the effect is off for this session");
+                LOGGER.error("Bloom framebuffer incomplete");
                 GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, prevFbo);
                 GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, prevTexture);
                 destroyBloomTargets();
-                bloomFailed = true;
                 return false;
             }
         }
@@ -7047,8 +7070,10 @@ final class VkTerrainRenderer {
             GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER, GL30C.GL_COLOR_ATTACHMENT0,
                     GL11C.GL_TEXTURE_2D, bloomFarTexture[i], 0);
             if (GL30C.glCheckFramebufferStatus(GL30C.GL_FRAMEBUFFER) != GL30C.GL_FRAMEBUFFER_COMPLETE) {
+                LOGGER.error("Bloom framebuffer incomplete");
                 GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, prevFbo);
                 GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, prevTexture);
+                destroyBloomTargets();
                 return false;
             }
         }
@@ -7059,11 +7084,10 @@ final class VkTerrainRenderer {
         GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER, GL30C.GL_COLOR_ATTACHMENT0,
                 GL11C.GL_TEXTURE_2D, bloomMaskTexture, 0);
         if (GL30C.glCheckFramebufferStatus(GL30C.GL_FRAMEBUFFER) != GL30C.GL_FRAMEBUFFER_COMPLETE) {
-            LOGGER.error("Bloom mask framebuffer incomplete; the effect is off for this session");
+            LOGGER.error("Bloom mask framebuffer incomplete");
             GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, prevFbo);
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, prevTexture);
             destroyBloomTargets();
-            bloomFailed = true;
             return false;
         }
         GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, prevFbo);
@@ -7160,7 +7184,7 @@ final class VkTerrainRenderer {
                 .sType(VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER)
                 .srcAccessMask(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
                 .dstAccessMask(VK_ACCESS_TRANSFER_READ_BIT)
-                .oldLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+                .oldLayout(sharedLayout())
                 .newLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
                 .srcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
                 .dstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
@@ -7183,7 +7207,7 @@ final class VkTerrainRenderer {
                 .srcAccessMask(VK_ACCESS_TRANSFER_READ_BIT)
                 .dstAccessMask(VK_ACCESS_SHADER_READ_BIT)
                 .oldLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
-                .newLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                .newLayout(sharedLayout());
         vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, null, null, barrier);
         readbackRecorded = true;
@@ -7210,8 +7234,11 @@ final class VkTerrainRenderer {
                 check(vkWaitForFences(device(), fence, true, 1_000_000_000L), "vkWaitForFences(readback)");
                 int samples = width * READBACK_ROWS;
                 int covered = 0;
+                // The last byte of a pixel is the top of its alpha in both
+                // formats: RGBA8 and RGBA16F alike.
+                int bpp = colourBytesPerPixel();
                 for (int i = 0; i < samples; i++) {
-                    if (MemoryUtil.memGetByte(readbackMapped + i * 4L + 3) != 0) {
+                    if (MemoryUtil.memGetByte(readbackMapped + i * (long) bpp + bpp - 1) != 0) {
                         covered++;
                     }
                 }
@@ -8178,7 +8205,7 @@ final class VkTerrainRenderer {
         hdrFrame = Boolean.parseBoolean(
                 System.getProperty("vulkanmodnext.hdrFrameActive", "false"));
         exposure = clampPercent(intProperty("vulkanmodnext.exposure", 50));
-        sceneGamma = intProperty("vulkanmodnext.sceneGamma", 50);
+        sceneGamma = Math.max(0, Math.min(100, intProperty("vulkanmodnext.sceneGamma", 50)));
         colourVision = Math.max(0, Math.min(3, intProperty("vulkanmodnext.colourVision", 0)));
         skyGradient = clampPercent(intProperty("vulkanmodnext.skyGradient", 0));
         sceneOcclusion = Boolean.parseBoolean(
@@ -8531,10 +8558,12 @@ final class VkTerrainRenderer {
      * Two things separate it from the opaque one. Its colour attachment starts
      * cleared to fully transparent, because what it produces is composited over
      * a frame OpenGL has meanwhile drawn entities into rather than replacing
-     * it. And its depth attachment is loaded rather than cleared, and never
-     * stored: the layer is depth-tested against what is already there and
-     * writes nothing back, which is what vanilla does too — {@code
-     * depthMask(false)} right before it asks for the layer.
+     * it. And its depth attachment is loaded rather than cleared: the layer is
+     * depth-tested against what is already there and writes nothing back,
+     * which is what vanilla does too — {@code depthMask(false)} right before it
+     * asks for the layer. It is still stored, because the creature subpass
+     * before the layer does write depth, and with shared depth the game goes
+     * on using that image for rain, clouds and the hand.
      */
     private void createTranslucentRenderPass(MemoryStack stack) {
         VkAttachmentDescription.Buffer attachments = VkAttachmentDescription.calloc(2, stack);
@@ -8551,7 +8580,7 @@ final class VkTerrainRenderer {
                 .format(depthFormat(stack))
                 .samples(VK_SAMPLE_COUNT_1_BIT)
                 .loadOp(VK_ATTACHMENT_LOAD_OP_LOAD)
-                .storeOp(VK_ATTACHMENT_STORE_OP_DONT_CARE)
+                .storeOp(VK_ATTACHMENT_STORE_OP_STORE)
                 .stencilLoadOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE)
                 .stencilStoreOp(VK_ATTACHMENT_STORE_OP_DONT_CARE)
                 // Not what the opaque pass left it in — what OpenGL says it is
@@ -9156,11 +9185,8 @@ final class VkTerrainRenderer {
      * clear value, and that is exactly the sky. No test on colour, which would
      * catch a white cloud or a snowy peak.
      *
-     * Screen height rather than a true view direction, and this is the honest
-     * limit of it: looking straight up puts the deepest part of the gradient
-     * across the middle of the screen instead of at the point overhead. That is
-     * what every cheap version of this does, it is a look rather than a sky
-     * model, and the slider is where somebody decides how much of it they want.
+     * It is a look rather than a sky model, and the slider is where somebody
+     * decides how much of it they want.
      */
     private int buildSkyGradientProgram() {
         return buildQuadProgram(
@@ -9756,7 +9782,7 @@ final class VkTerrainRenderer {
         return !"false".equals(System.getProperty("vulkanmodnext.depthBlit"));
     }
 
-    /** Read where the sampler is built; the world has to be reloaded to change it. */
+    /** Checked every frame by refreshSamplerIfNeeded; a change re-mirrors the atlas, no reload needed. */
     private static boolean flatBlockColours() {
         return "true".equals(System.getProperty("vulkanmodnext.flatBlockColours"));
     }
@@ -9817,6 +9843,11 @@ final class VkTerrainRenderer {
                 GL11C.GL_TEXTURE_2D, 0, 0);
         GL30C.glFramebufferTexture2D(GL30C.GL_DRAW_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT,
                 GL11C.GL_TEXTURE_2D, glDepthTexture, 0);
+        // Depth only now: without this an older driver calls the framebuffer
+        // incomplete for the colour draw buffer it no longer has, and the
+        // refusal would be blamed on the depth image.
+        GL20C.glDrawBuffers(GL11C.GL_NONE);
+        GL11C.glReadBuffer(GL11C.GL_NONE);
         int depthStatus = GL30C.glCheckFramebufferStatus(GL30C.GL_DRAW_FRAMEBUFFER);
         GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, prevDraw);
         GL30C.glDeleteFramebuffers(fbo);
@@ -9882,10 +9913,9 @@ final class VkTerrainRenderer {
         int scratchTexture = 0;
         int readFbo = 0;
         int drawFbo = 0;
+        boolean pushed = false;
 
         try (MemoryStack stack = stackPush()) {
-            IntBuffer viewport = stack.mallocInt(4);
-            GL11C.glGetIntegerv(GL11C.GL_VIEWPORT, viewport);
             java.nio.ByteBuffer pixel = stack.calloc(16);
 
             org.lwjgl.opengl.GL11.glPushAttrib(org.lwjgl.opengl.GL11.GL_ENABLE_BIT
@@ -9895,6 +9925,7 @@ final class VkTerrainRenderer {
                     | org.lwjgl.opengl.GL11.GL_CURRENT_BIT
                     | org.lwjgl.opengl.GL11.GL_VIEWPORT_BIT
                     | org.lwjgl.opengl.GL11.GL_POLYGON_BIT);
+            pushed = true;
             GL20C.glUseProgram(0);
             GL11C.glDisable(GL11C.GL_DEPTH_TEST);
             GL11C.glDisable(GL11C.GL_BLEND);
@@ -9939,10 +9970,12 @@ final class VkTerrainRenderer {
             GL11C.glFinish();
             LOGGER.info("Shared memory probe: all three steps survived — this driver can read"
                     + " what Vulkan shared with it");
-
-            GL11C.glViewport(viewport.get(0), viewport.get(1), viewport.get(2), viewport.get(3));
-            org.lwjgl.opengl.GL11.glPopAttrib();
         } finally {
+            // The attribute stack is the game's too: a probe that throws must
+            // not leave it one deeper. GL_VIEWPORT_BIT brings the viewport back.
+            if (pushed) {
+                org.lwjgl.opengl.GL11.glPopAttrib();
+            }
             if (scratchTexture != 0) {
                 GL11C.glDeleteTextures(scratchTexture);
             }
@@ -10067,14 +10100,7 @@ final class VkTerrainRenderer {
         }
     }
 
-    /**
-     * One GL pass, timed by the card itself.
-     *
-     * Two query objects used in turn, because reading the one just written
-     * means waiting for the card to reach it — which stops the processor dead
-     * and changes the very thing being measured. The other one holds last
-     * frame's answer and is ready by now.
-     */
+    /** A GL pass's latest time on the card for the log, or "n/a" when the driver cannot time it. */
     private static String glTimeText(GlTimer timer) {
         double ms = timer.millis();
         return ms < 0.0 ? "n/a" : String.format("%.2f ms", ms);
@@ -10201,6 +10227,9 @@ final class VkTerrainRenderer {
         GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, fbo);
         GL30C.glFramebufferTexture2D(GL30C.GL_READ_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT,
                 GL11C.GL_TEXTURE_2D, glDepthTexture, 0);
+        // Depth only, so the read buffer has to say so or an older driver
+        // calls the framebuffer incomplete.
+        GL11C.glReadBuffer(GL11C.GL_NONE);
         int status = GL30C.glCheckFramebufferStatus(GL30C.GL_READ_FRAMEBUFFER);
         GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, prevRead);
         if (status != GL30C.GL_FRAMEBUFFER_COMPLETE) {
@@ -10714,6 +10743,8 @@ final class VkTerrainRenderer {
             destroyToneTargets();
             destroySceneOcclusionTargets();
             destroyRayTargets();
+            destroyMotionTargets();
+            destroyMotionProgram();
             GL11C.glDeleteTextures(glColorTexture);
             GL11C.glDeleteTextures(glDepthTexture);
             EXTMemoryObject.glDeleteMemoryObjectsEXT(glColorMemoryObject);
@@ -10734,6 +10765,9 @@ final class VkTerrainRenderer {
             compositeWaitTimer.destroy();
             depthBlitTimer.destroy();
             depthImportTimer.destroy();
+            occlusionTimer.destroy();
+            toneTimer.destroy();
+            bloomTimer.destroy();
         } else {
             gameDepthTexture = 0;
             glDepthWriteFbo = -1;
@@ -10809,19 +10843,21 @@ final class VkTerrainRenderer {
                     lightmapStagingMapped[i] = 0;
                 }
             }
-            for (int i = 0; i < framesInFlight; i++) {
-                if (frameUniformMemories[i] != 0) {
-                    vkUnmapMemory(device(), frameUniformMemories[i]);
-                    vkDestroyBuffer(device(), frameUniformBuffers[i], null);
-                    vkFreeMemory(device(), frameUniformMemories[i], null);
-                    frameUniformBuffers[i] = 0;
-                    frameUniformMemories[i] = 0;
-                    frameUniformMapped[i] = 0;
-                }
-            }
             MemoryUtil.memFree(lightmapReadBuffer);
             lightmapReadBuffer = null;
             lightmapImage = 0;
+        }
+        // Made with the descriptor infrastructure, not with the lightmap, which
+        // only exists once the game has handed one over.
+        for (int i = 0; i < framesInFlight; i++) {
+            if (frameUniformMemories[i] != 0) {
+                vkUnmapMemory(device(), frameUniformMemories[i]);
+                vkDestroyBuffer(device(), frameUniformBuffers[i], null);
+                vkFreeMemory(device(), frameUniformMemories[i], null);
+                frameUniformBuffers[i] = 0;
+                frameUniformMemories[i] = 0;
+                frameUniformMapped[i] = 0;
+            }
         }
         if (quadIndexBuffer != 0) {
             vkDestroyBuffer(device(), quadIndexBuffer, null);

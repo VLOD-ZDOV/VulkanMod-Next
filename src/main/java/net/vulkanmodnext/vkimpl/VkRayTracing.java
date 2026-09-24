@@ -77,7 +77,6 @@ final class VkRayTracing {
 
     private static final Logger LOGGER = LogManager.getLogger("VulkanModNext/RayTracing");
 
-    /** Vertex stride of the mirrored chunk geometry, positions first. */
     /**
      * Creature geometry, which is captured whole and never packed.
      *
@@ -402,7 +401,10 @@ final class VkRayTracing {
                 buildOne(stack, creatureBlas, creatureAddress);
             }
             int instances = writeInstances(stack);
-            if (instances > 0) {
+            // Rebuilt even when empty once this slot has a structure: left
+            // alone, it would go on naming bottom-level structures that are
+            // retired and then freed while the shader still traces through it.
+            if (instances > 0 || topLevel(activeSlot) != 0) {
                 buildTopLevel(stack, instances);
             }
             lastInstances = instances;
@@ -1036,10 +1038,19 @@ final class VkRayTracing {
         if (tlas != null && tlas.length >= slotCount) {
             return;
         }
-        tlas = new long[slotCount];
-        tlasBuffer = new long[slotCount];
-        tlasMemory = new long[slotCount];
-        tlasCapacity = new long[slotCount];
+        // Grown rather than replaced: the structures already in the old
+        // arrays are still live, and dropping them would leak them.
+        if (tlas == null) {
+            tlas = new long[slotCount];
+            tlasBuffer = new long[slotCount];
+            tlasMemory = new long[slotCount];
+            tlasCapacity = new long[slotCount];
+            return;
+        }
+        tlas = java.util.Arrays.copyOf(tlas, slotCount);
+        tlasBuffer = java.util.Arrays.copyOf(tlasBuffer, slotCount);
+        tlasMemory = java.util.Arrays.copyOf(tlasMemory, slotCount);
+        tlasCapacity = java.util.Arrays.copyOf(tlasCapacity, slotCount);
     }
 
     private void retireTopLevel(int slot) {
@@ -1069,12 +1080,15 @@ final class VkRayTracing {
         entry.bytes = blas.bytes;
         entry.frame = frameIndex;
         retired.add(entry);
+        // sourceOffset/Size/Version are left alone: buildOne retires the old
+        // structure after they were set for the new build, and clearing the
+        // size here made every chunk look stale again the following frame.
+        // A zero structure already marks a Blas as needing a build.
         blas.structure = 0;
         blas.buffer = 0;
         blas.memory = 0;
         blas.address = 0;
         blas.bytes = 0;
-        blas.sourceSize = 0;
     }
 
     /**

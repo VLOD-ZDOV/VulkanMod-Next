@@ -58,13 +58,6 @@ final class VkChunkMirror {
         int capacity;
         int size;
         /**
-         * How many bytes at the start of this range face straight down, and how
-         * many at the end face straight up.
-         *
-         * Zero for geometry that was not grouped, which is the safe reading:
-         * the draw then covers the whole range exactly as it always did.
-         */
-        /**
          * How many down-facing quads of this range lie below each of the
          * section's seventeen level boundaries, and how many up-facing ones lie
          * at or above it — the first seventeen entries and the second.
@@ -340,7 +333,7 @@ final class VkChunkMirror {
     private long geometryMemory;
     private long geometryCapacity;
     private long nextGeometryOffset;
-    /** Once a session: the second complaint says nothing the first did not. */
+    /** Holes in the geometry buffer, sorted by offset; see {@link FreeRange}. */
     private final List<FreeRange> freeRanges = new ArrayList<FreeRange>();
     /**
      * How much VRAM the geometry buffer is allowed to take before growth turns
@@ -419,6 +412,7 @@ final class VkChunkMirror {
      * the recorded copies are submitted and waited on before the head returns
      * to zero, so nothing is overwritten while the GPU is still reading it.
      */
+    private long stagingBuffer;
     /**
      * Sized against the wrap, not against a single upload. Wrapping blocks the
      * render thread until the GPU has drained the ring, so the interval between
@@ -428,7 +422,6 @@ final class VkChunkMirror {
      * be — this replaced a pinned copy per chunk, not nothing.
      */
     private static final long STAGING_RING_MIN = 96L * 1024L * 1024L;
-    private long stagingBuffer;
     private long stagingMemory;
     private long stagingMappedAddress;
     private long stagingCapacity;
@@ -504,7 +497,6 @@ final class VkChunkMirror {
         pendingMaterialCopyCount++;
     }
 
-    /** Called by the terrain renderer at the start of each frame. */
     /**
      * The thread that stamps frames, remembered so the assumption below can be
      * checked instead of believed.
@@ -527,6 +519,7 @@ final class VkChunkMirror {
     private Thread stampingThread;
     private boolean threadWarned;
 
+    /** Called by the terrain renderer at the start of each frame. */
     synchronized void setFrameStamp(long stamp) {
         this.stampingThread = Thread.currentThread();
         this.frameStamp = stamp;
@@ -998,12 +991,14 @@ final class VkChunkMirror {
         }
     }
 
-    /** The staged copy for this slot if it still matches, else -1. */
-    /** {@link #takeStaged} plus the two group sizes the copy worked out. */
     /** Materials that came with the staged geometry, for this upload only. */
     private byte[] carriedMaterial = new byte[0];
     private int carriedVertices;
 
+    /**
+     * {@link #takeStaged} plus what the copy worked out on the way: the facing
+     * shelves and the materials it carried.
+     */
     private long takeStagedGrouped(int slot, int size, Entry entry) {
         carriedVertices = 0;
         synchronized (workerLock) {
@@ -1027,6 +1022,7 @@ final class VkChunkMirror {
         return takeStaged(slot, size);
     }
 
+    /** The staged copy for this slot if it still matches, else -1. */
     private long takeStaged(int slot, int size) {
         synchronized (workerLock) {
             Staged entry = staged.remove(slot);
@@ -1296,13 +1292,19 @@ final class VkChunkMirror {
     /** Chunks turned away because the geometry buffer could not grow. */
     private long refusedRanges;
 
-    /** Grows the staging ring if a single upload would not fit in it. */
+    /**
+     * Grows the staging ring if a single upload would not fit in it.
+     *
+     * Measured against the render thread's half, not the whole ring: that half
+     * is all {@link #allocateStagingRange} ever hands out, and an upload larger
+     * than it would run on into the builder region.
+     */
     private void ensureStagingRing(int needed) {
-        if (stagingCapacity >= needed && stagingBuffer != 0) {
+        if (stagingCapacity - stagingCapacity / 2 >= needed && stagingBuffer != 0) {
             return;
         }
         long capacity = Math.max(STAGING_RING_MIN, stagingCapacity == 0 ? STAGING_RING_MIN : stagingCapacity);
-        while (capacity < needed) {
+        while (capacity - capacity / 2 < needed) {
             capacity *= 2;
         }
         if (stagingBuffer != 0) {
@@ -1968,7 +1970,11 @@ final class VkChunkMirror {
                         // that the allocation this growth was for lands
                         // somewhere real.
                         int dropped = dropEntriesPast(oldCapacity);
-                        nextGeometryOffset = oldCapacity;
+                        // Rounded down to a vertex: every range has to start on
+                        // one, and the capacity is a MiB multiple, not a stride
+                        // multiple. Nothing kept ends past this point, because
+                        // every kept range ends on a vertex boundary too.
+                        nextGeometryOffset = oldCapacity - oldCapacity % VertexLayout.stride();
                         LOGGER.error("Geometry mark {} is past the buffer it indexes ({}); the {} "
                                         + "bytes beyond it were never uploaded, so {} chunk(s) have "
                                         + "been dropped and will return when the game rebuilds them",
@@ -2055,6 +2061,15 @@ final class VkChunkMirror {
         vkCmdFillBuffer(uploadCommandBuffer, materialBuffer, 0, VK_WHOLE_SIZE, 0);
         if (oldBuffer != 0 && keep > 0) {
             try (MemoryStack stack = stackPush()) {
+                // Two transfer writes to the same bytes are unordered without
+                // this: the fill could land after the copy and wipe it.
+                VkMemoryBarrier.Buffer fillDone = VkMemoryBarrier.calloc(1, stack);
+                fillDone.get(0)
+                        .sType(VK_STRUCTURE_TYPE_MEMORY_BARRIER)
+                        .srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT)
+                        .dstAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
+                vkCmdPipelineBarrier(uploadCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                        VK_PIPELINE_STAGE_TRANSFER_BIT, 0, fillDone, null, null);
                 VkBufferCopy.Buffer copy = VkBufferCopy.calloc(1, stack);
                 copy.get(0).srcOffset(0).dstOffset(0).size(keep);
                 vkCmdCopyBuffer(uploadCommandBuffer, oldBuffer, materialBuffer, copy);
