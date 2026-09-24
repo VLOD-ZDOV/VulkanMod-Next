@@ -11,11 +11,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
- * Puts a different picture on the sun, and touches nothing else.
+ * Puts a different picture on the sun and the moon, and touches nothing else.
  *
  * The sky is drawn by one long vanilla method that binds several textures in
  * turn — the sky itself, the sun, the moon. Redirecting the bind and answering
- * only for the sun is the narrowest possible change: the quad, its size, its
+ * only for the sun and the moon is the narrowest possible change: the quad, its size, its
  * position, the blend, the order and the moon are all still vanilla's, and a
  * mod that draws its own sky never reaches this code at all.
  */

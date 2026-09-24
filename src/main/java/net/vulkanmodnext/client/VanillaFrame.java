@@ -547,6 +547,11 @@ public final class VanillaFrame {
      */
     public static String walkStats() {
         if (walkAsked == 0) {
+            // Reset here too: every other counter in this class reads and resets,
+            // and leaving these standing let the next interval report walks and
+            // frames that belonged to this one.
+            walkRan = 0L;
+            walkFramesSeen = 0L;
             return "visibility walk: never reached our check — the dirty flag was already set";
         }
         String line = String.format(

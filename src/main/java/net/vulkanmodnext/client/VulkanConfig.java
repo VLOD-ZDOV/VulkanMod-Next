@@ -991,7 +991,7 @@ public final class VulkanConfig {
                 net.vulkanmodnext.VulkanModNext.LOGGER.info(
                         "Pack Chunk Vertices is now on by default and has been switched on in your "
                                 + "settings. It saves 188 MiB of video memory and some frames; "
-                                + "Advanced turns it off again if you want it off.");
+                                + "Optimizations turns it off again if you want it off.");
             }
             settingsRevision = 1;
             store(CATEGORY_ADVANCED, "settingsRevision", settingsRevision);
@@ -1626,11 +1626,6 @@ public final class VulkanConfig {
     }
 
     /**
-     * Returns every mod-owned setting to its shipped value. Minecraft's own
-     * settings are left alone: they are not ours to reset, and the screen only
-     * borrows them.
-     */
-    /**
      * Puts every diagnostic view back, wherever the settings came from.
      *
      * These are the views that paint the world as something other than itself —
@@ -1652,6 +1647,11 @@ public final class VulkanConfig {
         setShowReflections(DEF_SHOW_REFLECTIONS);
     }
 
+    /**
+     * Returns every mod-owned setting to its shipped value. Minecraft's own
+     * settings are left alone: they are not ours to reset, and the screen only
+     * borrows them.
+     */
     public static void resetToDefaults() {
         clearDiagnosticViews();
         setContactShadows(DEF_CONTACT_SHADOWS);
@@ -1730,6 +1730,12 @@ public final class VulkanConfig {
         setWaterCaustics(DEF_WATER_CAUSTICS);
         setWetSurfaces(DEF_WET_SURFACES);
         setSunHaze(DEF_SUN_HAZE);
+        // Every preset writes these three, and until they were here a showcase
+        // preset followed by Reset left the sky deepened, leaf shadows at full
+        // and the occlusion reading the whole picture.
+        setSkyGradient(DEF_SKY_GRADIENT);
+        setSceneOcclusion(DEF_SCENE_OCCLUSION);
+        setLeafShadows(DEF_LEAF_SHADOWS);
         setCloudTint(DEF_CLOUD_TINT);
         setPreloadQueue(DEF_PRELOAD_QUEUE);
         setPreloadScan(DEF_PRELOAD_SCAN);

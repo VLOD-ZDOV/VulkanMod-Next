@@ -82,12 +82,16 @@ public abstract class FogDistanceMixin {
     /**
      * Whether the fog on screen is carrying gameplay state rather than distance.
      *
-     * No test for boss fog: it is set up elsewhere and by the time this runs it
-     * cannot be told apart from an ordinary view, so it is left alone by being
-     * out of reach rather than by being detected.
+     * Boss fog is linear like an ordinary view's and is set up in this same
+     * method, so the fog mode alone cannot tell it apart; it is asked for by
+     * name, the same way the game decides to draw it.
      */
     private static boolean tellsYouSomething() {
-        Entity view = Minecraft.getMinecraft().getRenderViewEntity();
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.ingameGUI != null && mc.ingameGUI.getBossOverlay().shouldCreateFog()) {
+            return true;
+        }
+        Entity view = mc.getRenderViewEntity();
         if (view == null) {
             return false;
         }

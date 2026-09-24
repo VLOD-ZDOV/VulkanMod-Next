@@ -161,18 +161,6 @@ public final class VulkanPresets {
     }
 
     /**
-     * Everything on, on the assumption that the machine can afford it.
-     *
-     * The mirror image of Potato, and written second on purpose: a preset that
-     * only ever gives things up leaves nothing to come back to. This is what
-     * "come back" means.
-     *
-     * Screen reflections are set well below their maximum. They are the newest
-     * and least settled of the effects here, and a preset is the wrong place to
-     * show somebody an effect at its most demanding and least finished — the
-     * slider is still there for anyone who wants to push it.
-     */
-    /**
      * What every showcase look shares: how the machine is asked to behave.
      *
      * Split out when the one "everything on" preset became four. The four
@@ -439,8 +427,8 @@ public final class VulkanPresets {
         look.animations = true;
         look.flatBlockColours = false;
         look.framesInFlight = 2;
-        // Same reasoning as in Beautiful: free of pixels, and this preset caps
-        // the render distance at the same thirty-two.
+        // Same reasoning as in Beautiful: free of pixels, and this preset
+        // leaves up to thirty-two chunks of render distance to build.
         look.chunkBuildThreads = VulkanConfig.coresForChunkBuilding();
         look.particles = 1;
         look.fancy = true;
@@ -637,7 +625,13 @@ public final class VulkanPresets {
         settings.clouds = look.clouds;
         settings.entityShadows = look.entityShadows;
         settings.limitFramerate = look.fpsLimit;
-        settings.enableVsync = look.vsync;
+        if (settings.enableVsync != look.vsync) {
+            settings.enableVsync = look.vsync;
+            // What vanilla's own toggle does, and what the VSync row does. The
+            // field alone is read only when the display is created, so without
+            // this Potato's vsync did nothing until the next start.
+            org.lwjgl.opengl.Display.setVSyncEnabled(look.vsync);
+        }
         if (look.renderDistanceExact > 0) {
             settings.renderDistanceChunks = look.renderDistanceExact;
         } else if (settings.renderDistanceChunks > look.renderDistanceCap) {

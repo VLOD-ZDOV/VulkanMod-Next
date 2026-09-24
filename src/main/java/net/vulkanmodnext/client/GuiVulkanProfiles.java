@@ -47,8 +47,13 @@ public final class GuiVulkanProfiles extends GuiScreen {
         this.parent = parent;
     }
 
+    /**
+     * Twelve pixels above the name field more than the list itself needs: the
+     * status line goes there. At {@code height - 78} it was drawn at exactly
+     * the field's own top and printed over whatever was being typed.
+     */
     private int listBottom() {
-        return this.height - 78;
+        return this.height - 90;
     }
 
     private int listLeft() {
@@ -153,9 +158,12 @@ public final class GuiVulkanProfiles extends GuiScreen {
                 }
                 break;
             case DELETE:
-                VulkanProfiles.delete(this.selected);
-                this.status = Lang.tr(Lang.UI, "Deleted") + ": " + this.selected;
-                this.selected = null;
+                if (VulkanProfiles.delete(this.selected)) {
+                    this.status = Lang.tr(Lang.UI, "Deleted") + ": " + this.selected;
+                    this.selected = null;
+                } else {
+                    this.status = Lang.tr(Lang.UI, "Could not write that profile");
+                }
                 break;
             case DONE:
                 this.mc.displayGuiScreen(this.parent);
@@ -168,6 +176,8 @@ public final class GuiVulkanProfiles extends GuiScreen {
         if (this.selected != null && !this.names.contains(this.selected)) {
             this.selected = null;
         }
+        // A deleted row can leave the list scrolled past its own end.
+        clampScroll();
         updateButtons();
     }
 
@@ -212,7 +222,7 @@ public final class GuiVulkanProfiles extends GuiScreen {
 
         this.nameField.drawTextBox();
         if (!this.status.isEmpty()) {
-            this.fontRenderer.drawString(this.status, left, bottom + 6, 0xA0A0A0);
+            this.fontRenderer.drawString(this.status, left, bottom + 5, 0xA0A0A0);
         }
         super.drawScreen(mouseX, mouseY, partialTicks);
         SixSeven.end();

@@ -114,17 +114,8 @@ final class Interop {
     private static final int GENERIC_ALL = 0x10000000;
 
     /**
-     * Puts the Win32 access rights in front of an export structure, and hands
-     * back whatever should now start the chain.
-     *
-     * On anything but Windows this is the export structure unchanged, because
-     * a file descriptor carries no rights to ask for. On Windows the rights are
-     * only defaulted when the structure is missing, and a driver may default
-     * them to nothing: the handle then imports cleanly and never signals, which
-     * is indistinguishable from a hang until the card is reset.
-     */
-    /**
-     * The same rights, for an exported memory handle.
+     * The access rights of {@link #appendWin32SemaphoreRights}, for an exported
+     * memory handle.
      *
      * Separate structure, identical reasoning: without it the rights on the
      * handle are whatever the driver defaults to, and a handle imported without
@@ -145,6 +136,16 @@ final class Interop {
         return rights.address();
     }
 
+    /**
+     * Puts the Win32 access rights in front of an export structure, and hands
+     * back whatever should now start the chain.
+     *
+     * On anything but Windows this is the export structure unchanged, because
+     * a file descriptor carries no rights to ask for. On Windows the rights are
+     * only defaulted when the structure is missing, and a driver may default
+     * them to nothing: the handle then imports cleanly and never signals, which
+     * is indistinguishable from a hang until the card is reset.
+     */
     static long appendWin32SemaphoreRights(MemoryStack stack, long exportInfo) {
         if (!WINDOWS) {
             return exportInfo;
@@ -532,6 +533,12 @@ final class Interop {
             int glHandleType = D3D12_FENCE_SEMAPHORES
                     ? EXTSemaphoreWin32.GL_HANDLE_TYPE_D3D12_FENCE_EXT
                     : EXTSemaphoreWin32.GL_HANDLE_TYPE_OPAQUE_WIN32_EXT;
+            // Drained first: an error some earlier GL call left in the queue
+            // would otherwise be read below as this import being refused.
+            for (int drained = 0; drained < 32
+                    && GL11C.glGetError() != GL11C.GL_NO_ERROR; drained++) {
+                // nothing: only emptying the queue
+            }
             EXTSemaphoreWin32.glImportSemaphoreWin32HandleEXT(glSem, glHandleType, pHandle.get(0));
             // Checked here and nowhere else, because a refused import has no
             // other symptom: the semaphore object exists, the wait on it is
@@ -539,6 +546,8 @@ final class Interop {
             // startup and fall back to vanilla than to hang the card.
             int error = org.lwjgl.opengl.GL11C.glGetError();
             if (error != 0) {
+                // Refused, so nothing on the GL side holds it: ours to close.
+                closeHandle(pHandle.get(0));
                 throw new IllegalStateException("glImportSemaphoreWin32HandleEXT refused the "
                         + "exported semaphore (GL error 0x" + Integer.toHexString(error)
                         + "). Waiting on it from OpenGL would never return.");

@@ -161,7 +161,16 @@ public final class VulkanProfiles {
         mc.gameSettings.clouds = number(values, "mc.clouds", mc.gameSettings.clouds);
         mc.gameSettings.entityShadows = bool(values, "mc.shadows", mc.gameSettings.entityShadows);
         mc.gameSettings.limitFramerate = number(values, "mc.fpsLimit", mc.gameSettings.limitFramerate);
-        mc.gameSettings.enableVsync = bool(values, "mc.vsync", mc.gameSettings.enableVsync);
+        boolean vsync = bool(values, "mc.vsync", mc.gameSettings.enableVsync);
+        if (vsync != mc.gameSettings.enableVsync) {
+            mc.gameSettings.enableVsync = vsync;
+            // The field alone is read only when the display is created.
+            org.lwjgl.opengl.Display.setVSyncEnabled(vsync);
+        }
+        // The profile may have brought Extreme Render Distance with it, on or
+        // off, and the slider's ceiling follows that switch only through here;
+        // this also pulls a restored distance back inside the limit.
+        RenderDistanceLimit.apply();
 
         int mipmap = number(values, "mc.mipmap", wasMipmap);
         if (mipmap != wasMipmap) {

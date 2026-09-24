@@ -135,6 +135,14 @@ public final class Lang {
             "No profiles yet — type a name below and press Save As",
             "Everything this mod owns, plus the game's own settings that decide the frame rate",
             "Search settings",
+            // Asked for by the profile, class patch and settings screens and
+            // missing here, so the generated file never carried them and no
+            // language could translate them.
+            "Deleted", "Get", "Version", "is available",
+            "Class Patches",
+            "What this mod is allowed to rewrite. Changes apply the next time the game starts.",
+            "Turn Everything Back On", "Do Not Install", "Install Again",
+            "It stood down on its own", "always", "stood down", "off", "on", "on after restart",
     };
 
     /**

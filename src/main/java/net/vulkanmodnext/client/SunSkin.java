@@ -49,6 +49,7 @@ public final class SunSkin {
         if (location != null && builtFor == wanted) {
             return location;
         }
+        ResourceLocation old = location;
         try {
             location = build();
             builtFor = wanted;
@@ -56,6 +57,7 @@ public final class SunSkin {
             // A sun we cannot draw is a sun the game draws instead.
             location = null;
         }
+        release(old);
         return location;
     }
 
@@ -195,13 +197,30 @@ public final class SunSkin {
         if (moonLocation != null && moonBuiltFor == wanted) {
             return moonLocation;
         }
+        ResourceLocation old = moonLocation;
         try {
             moonLocation = moonSheet();
             moonBuiltFor = wanted;
         } catch (Throwable t) {
             moonLocation = null;
         }
+        release(old);
         return moonLocation;
+    }
+
+    /**
+     * Deletes a picture that has been replaced. Every rebuild is a new texture
+     * under a new name, and a slider dragged across its range builds dozens.
+     */
+    private static void release(ResourceLocation old) {
+        if (old == null) {
+            return;
+        }
+        try {
+            Minecraft.getMinecraft().getTextureManager().deleteTexture(old);
+        } catch (Throwable ignored) {
+            // A texture that cannot be deleted is a leak, not a reason to fail.
+        }
     }
 
     private static ResourceLocation upload(String name, BufferedImage image) {
