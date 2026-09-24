@@ -151,6 +151,15 @@ public abstract class OwnVisibilityWalkMixin implements SectionIndex {
     private int vulkanmodnext$lastWalkY = Integer.MIN_VALUE;
     @Unique
     private int vulkanmodnext$lastWalkZ = Integer.MIN_VALUE;
+    /**
+     * Which way the camera faced at the last walk. Turning changes what is on
+     * screen as surely as stepping does — the frustum is part of the walk — so
+     * it is answered at once too, exactly as vanilla's own arming does.
+     */
+    @Unique
+    private float vulkanmodnext$lastWalkPitch = Float.NaN;
+    @Unique
+    private float vulkanmodnext$lastWalkYaw = Float.NaN;
 
     /**
      * The longest a chunk may wait to appear, in nanoseconds.
@@ -182,7 +191,9 @@ public abstract class OwnVisibilityWalkMixin implements SectionIndex {
         int cameraZ = MathHelper.floor(viewEntity.posZ);
         boolean cameraMoved = cameraX != vulkanmodnext$lastWalkX
                 || cameraY != vulkanmodnext$lastWalkY
-                || cameraZ != vulkanmodnext$lastWalkZ;
+                || cameraZ != vulkanmodnext$lastWalkZ
+                || viewEntity.rotationPitch != vulkanmodnext$lastWalkPitch
+                || viewEntity.rotationYaw != vulkanmodnext$lastWalkYaw;
         if (!cameraMoved && started - vulkanmodnext$lastWalkNanos < VULKANMOD112$CHURN_INTERVAL) {
             VanillaFrame.countOwnWalkHeld();
             return false;
@@ -207,6 +218,8 @@ public abstract class OwnVisibilityWalkMixin implements SectionIndex {
         vulkanmodnext$lastWalkX = cameraX;
         vulkanmodnext$lastWalkY = cameraY;
         vulkanmodnext$lastWalkZ = cameraZ;
+        vulkanmodnext$lastWalkPitch = viewEntity.rotationPitch;
+        vulkanmodnext$lastWalkYaw = viewEntity.rotationYaw;
         ((WalkTimer) self).vulkanmodnext$noteWalkRan();
         return false;
     }

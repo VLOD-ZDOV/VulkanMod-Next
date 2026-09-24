@@ -54,8 +54,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * The counting. "The walk ran on 1882 frames of 2316, from 136399 requests, of
  * which 102198 were the camera moving" is the sentence that says where the
  * frame went, and nothing else in the game can say it — the flag is written
- * from three places that share nothing but the field, and only two of the
- * three arm it: the third is vanilla clearing it as the walk begins.
+ * from several places that share nothing but the field. Three are watched
+ * here, and only two of those arm it: the third is vanilla clearing it as the
+ * walk begins. The write near the top of {@code setupTerrain} that folds
+ * camera movement in (PUTFIELD ordinal 0) is deliberately not redirected.
  *
  * Camera movement is judged against this class's own record of the previous
  * frame, not vanilla's: the game overwrites its {@code lastViewEntity*} fields

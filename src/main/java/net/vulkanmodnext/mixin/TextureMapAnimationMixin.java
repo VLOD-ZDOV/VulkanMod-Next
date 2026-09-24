@@ -22,8 +22,9 @@ import java.util.List;
  * Every animated sprite in the atlas uploads a new frame to the GPU each tick,
  * whether or not a single one of its blocks is on screen. Vanilla has no
  * switch for it, and with a modpack's worth of machines and fluids the uploads
- * add up to real frame time. This is the blunt version of what OptiFine calls
- * Smart Animations: off means off, everywhere.
+ * add up to real frame time. With animations off this is the blunt version:
+ * off means off, everywhere. With Smart Animations on, only the sprites that
+ * something on screen is using are stepped (see {@code AnimatedSprites}).
  */
 @Mixin(TextureMap.class)
 public abstract class TextureMapAnimationMixin {

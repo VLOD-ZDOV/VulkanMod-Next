@@ -20,7 +20,7 @@ import org.apache.logging.log4j.Logger;
  * loader of its own with a different LWJGL, and it is brought up later, from
  * the game's own client side, once there is a window to draw into.
  *
- * @see net.vulkanmodnext.client.VulkanLoader for how the other half is reached
+ * @see net.vulkanmodnext.VulkanLoader for how the other half is reached
  * @see net.vulkanmodnext.VulkanBridge for the whole of what the two halves share
  */
 @Mod(

@@ -29,7 +29,7 @@ public final class VulkanLoader {
     /**
      * Volatile so that reading it needs no monitor.
      *
-     * It is written once, inside the synchronized constructor below, and read
+     * It is written once, inside the synchronized bridge() below, and read
      * from the render thread several times a frame and from chunk-building
      * threads besides. A monitor was being taken for each of those reads, on a
      * field that never changes again after the one write; volatile gives the
@@ -107,7 +107,7 @@ public final class VulkanLoader {
      *
      * LWJGL's own default of 64 KiB holds 252 entries, and current drivers list
      * around 270 for a single card — machines have failed to start over a
-     * shortfall of three kilobytes. 2 MiB is 8064 entries, twenty-nine drivers'
+     * shortfall of three kilobytes. 2 MiB is 8065 entries, twenty-nine drivers'
      * worth, which is room for whatever a multi-GPU machine with overlay layers
      * turns out to list.
      *
