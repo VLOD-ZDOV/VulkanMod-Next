@@ -159,6 +159,18 @@ public final class VkContext {
         return multiDrawIndirect;
     }
 
+    private boolean drawIndirectFirstInstance;
+
+    /**
+     * Whether an indirect command may carry a first instance other than zero.
+     * Every terrain command does — it is how each one names its chunk — and
+     * without the feature the value must be zero, in a buffer where the
+     * validation layer cannot see it. See the 1.12.2 twin.
+     */
+    public boolean canDrawIndirectFirstInstance() {
+        return drawIndirectFirstInstance;
+    }
+
     /**
      * The newest core version this loader will admit to, which here is 1.1.
      *
@@ -628,13 +640,22 @@ public final class VkContext {
             VkPhysicalDeviceFeatures available = VkPhysicalDeviceFeatures.mallocStack(stack);
             vkGetPhysicalDeviceFeatures(physicalDevice, available);
             this.multiDrawIndirect = available.multiDrawIndirect();
+            // -Dvulkanmodnext.noIndirectFirstInstance=true takes the fallback on
+            // a card that does not need it, so that path can be tested at all.
+            this.drawIndirectFirstInstance = available.drawIndirectFirstInstance()
+                    && !Boolean.getBoolean("vulkanmodnext.noIndirectFirstInstance");
+            if (!drawIndirectFirstInstance) {
+                LOGGER.warn("This driver will not take a first instance in an "
+                        + "indirect draw; terrain chunks will be drawn with direct calls instead");
+            }
             if (!multiDrawIndirect) {
                 LOGGER.warn("This driver cannot draw more than one indirect command at a time; "
                         + "terrain chunks will be drawn one command each");
             }
             VkPhysicalDeviceFeatures features = VkPhysicalDeviceFeatures.callocStack(stack)
                     .robustBufferAccess(true)
-                    .multiDrawIndirect(multiDrawIndirect);
+                    .multiDrawIndirect(multiDrawIndirect)
+                    .drawIndirectFirstInstance(drawIndirectFirstInstance);
 
             VkDeviceCreateInfo deviceInfo = VkDeviceCreateInfo.callocStack(stack)
                     .sType(VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO)
