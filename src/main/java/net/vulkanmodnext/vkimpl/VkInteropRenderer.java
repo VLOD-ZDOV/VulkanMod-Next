@@ -580,6 +580,8 @@ final class VkInteropRenderer {
         if (glMemoryObject != 0) {
             if (gl) {
                 EXTMemoryObject.glDeleteMemoryObjectsEXT(new int[] {glMemoryObject});
+                GL11C.glFinish();
+                Interop.releaseMemoryHandle(glMemoryObject);
             }
             glMemoryObject = 0;
         }
