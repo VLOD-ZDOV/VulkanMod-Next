@@ -11,6 +11,7 @@
     "FrameEndMixin",
     "ChunkUploadMixin",
     "ChunkRenderAccess",
+    "CloudTintMixin",
     "LightTextureAccess",
     "MaterialLayerMixin",
     "MaterialTagMixin",
