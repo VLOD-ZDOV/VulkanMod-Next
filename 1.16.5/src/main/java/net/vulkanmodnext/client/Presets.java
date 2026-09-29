@@ -287,7 +287,9 @@ public final class Presets {
         if (settings.renderDistance > v.renderDistanceCap) {
             settings.renderDistance = v.renderDistanceCap;
         }
-        settings.save();
+        if (!Flight.asked()) {
+            settings.save();
+        }
 
         if (mc.levelRenderer != null && mc.level != null
                 && (settings.graphicsMode != wasGraphics || settings.ambientOcclusion != wasSmooth

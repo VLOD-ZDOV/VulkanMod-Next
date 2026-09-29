@@ -323,7 +323,11 @@ public final class VulkanConfig {
             }
         }
         publish();
-        save();
+        // Not written during a flight: a preset flown once would otherwise
+        // stay in the dev client's config and be flown by every run after it.
+        if (!Flight.asked()) {
+            save();
+        }
         if (tagsBefore != get("materialTags")) {
             rebuildWorld("material tags");
         }
