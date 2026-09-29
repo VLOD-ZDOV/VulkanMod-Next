@@ -26,6 +26,12 @@ public class VulkanModNext {
     public VulkanModNext() {
         LOGGER.info("VulkanMod 1.16.5 loaded.");
         net.vulkanmodnext.client.VulkanConfig.load(FMLPaths.CONFIGDIR.get().toFile());
+        // On its own daemon thread and straight after the settings, so the
+        // answer is waiting by the time the player is in a world rather than
+        // being fetched while they play. The notice only speaks once it has one.
+        net.vulkanmodnext.client.UpdateCheck.start();
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(
+                new net.vulkanmodnext.client.UpdateNotice());
         // Puts the settings under Mods -> VulkanMod -> Config, which is where a
         // player already looks. A key binding is a second way in and can come
         // later; this one needs nothing from them.
