@@ -38,7 +38,8 @@
     "NearPlaneMixin",
     "ChunkBuildThreadsMixin",
     "ChunkBuilderExecutorMixin",
-    "AnimatedTexturesMixin"
+    "AnimatedTexturesMixin",
+    "FrustumTestMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }

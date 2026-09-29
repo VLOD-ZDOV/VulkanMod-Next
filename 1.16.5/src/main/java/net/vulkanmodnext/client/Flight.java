@@ -793,6 +793,7 @@ public final class Flight {
         VulkanModNext.LOGGER.info("Flight {} {}", TAG, ParticleHooks.stats());
         VulkanModNext.LOGGER.info("Flight {} {}", TAG, WeatherHooks.stats());
         VulkanModNext.LOGGER.info("Flight {} {}", TAG, BlockLightSources.stats());
+        VulkanModNext.LOGGER.info("Flight {} {}", TAG, CpuSavings.stats());
         net.vulkanmodnext.vkimpl.VkContext context = VulkanStartup.context();
         if (context != null) {
             VulkanModNext.LOGGER.info("Flight {} terrain:\n{}", TAG, context.terrainDiagnostics());
