@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.10.0-alpha.6]
+
+The sixth alpha. Five reviewers read the renderer's synchronization, the
+handover between OpenGL and Vulkan, the chunk copies, the settings and the
+previous release, and what they found that held up on checking is fixed here:
+a black-world bug that came back in the last alpha, two ways the two halves of
+the frame could fall out of step, and a handful of quieter ones. Flown with the
+validation layer on, with no findings. The Windows-only fix has not been tried
+on Windows yet — report against it.
+
 - **Fixed: on some drivers the world could come out black, or the occlusion
   and light shafts switch themselves off, after the first frame or any resize.**
   A check of the shared targets set the game's own frame to read from nothing,
