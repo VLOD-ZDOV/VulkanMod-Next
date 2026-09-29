@@ -148,6 +148,9 @@ public final class VulkanConfig {
             {"bloom", "vulkanmodnext.bloom"},
             {"celestialGlint", "vulkanmodnext.celestialGlint"},
             {"cloudShadows", "vulkanmodnext.cloudShadows"},
+            // The one whose property name is not its key, which is why the
+            // name-matching sweep that found the others missed it.
+            {"directionalLightStrength", "vulkanmodnext.directionalLight"},
             {"colourVision", "vulkanmodnext.colourVision"},
             {"contactShadows", "vulkanmodnext.contactShadows"},
             {"creatureLight", "vulkanmodnext.creatureLight"},
