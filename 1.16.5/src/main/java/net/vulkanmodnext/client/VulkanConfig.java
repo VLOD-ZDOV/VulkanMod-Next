@@ -300,6 +300,9 @@ public final class VulkanConfig {
         if ("materialTags".equals(setting.key) && before != get(setting.key)) {
             rebuildWorld("material tags");
         }
+        if ("extremeRenderDistance".equals(setting.key) && before != get(setting.key)) {
+            RenderDistanceLimit.apply();
+        }
         // The renderer reads settings as system properties, so a value that
         // only reaches this map is a value the picture never sees. Every way
         // of changing a setting goes through here, which is why it is here and
@@ -316,6 +319,7 @@ public final class VulkanConfig {
      */
     public static void setAll(Map<String, Integer> values) {
         int tagsBefore = get("materialTags");
+        int extremeBefore = get("extremeRenderDistance");
         for (Map.Entry<String, Integer> entry : values.entrySet()) {
             Settings.Setting setting = find(entry.getKey());
             if (setting != null) {
@@ -331,15 +335,24 @@ public final class VulkanConfig {
         if (tagsBefore != get("materialTags")) {
             rebuildWorld("material tags");
         }
+        if (extremeBefore != get("extremeRenderDistance")) {
+            RenderDistanceLimit.apply();
+        }
     }
 
     public static void reset() {
         int tagsBefore = get("materialTags");
+        int extremeBefore = get("extremeRenderDistance");
         for (Settings.Setting setting : Settings.all()) {
             VALUES.put(setting.key, setting.fallback);
         }
         if (tagsBefore != get("materialTags")) {
             rebuildWorld("material tags");
+        }
+        // Turning the switch off has to take the slider, and a distance past
+        // its new end, back with it — see RenderDistanceLimit.
+        if (extremeBefore != get("extremeRenderDistance")) {
+            RenderDistanceLimit.apply();
         }
         // Same reason as in set(): a value that only reaches this map is a
         // value the picture never sees. Written out separately rather than by

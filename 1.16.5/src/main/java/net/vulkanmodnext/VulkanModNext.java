@@ -56,7 +56,12 @@ public class VulkanModNext {
         // bus: that is where Forge expects them, and the constructor runs on
         // the loading threads, where adding to the game's key list races it.
         net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext.get().getModEventBus()
-                .addListener((net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent event) ->
-                        net.vulkanmodnext.client.Zoom.register());
+                .addListener((net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent event) -> {
+                    net.vulkanmodnext.client.Zoom.register();
+                    // On the main thread: this may pull the render distance
+                    // down and write options.txt, and the options belong to
+                    // the thread that draws with them.
+                    event.enqueueWork(net.vulkanmodnext.client.RenderDistanceLimit::apply);
+                });
     }
 }
