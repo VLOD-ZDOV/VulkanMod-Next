@@ -186,7 +186,7 @@ public final class Flight {
      */
     private static final String HOLD = System.getProperty("vulkanmodnext.flightHold", "").trim();
 
-    /** Named so the run says out loud that this version cannot honour it. */
+    /** A preset to apply on entering the world, by name: beautiful, goldenhour, ... */
     private static final String PRESET = System.getProperty("vulkanmodnext.flightPreset", "").trim();
 
     /**
@@ -369,11 +369,22 @@ public final class Flight {
 
     private static void enterWorld(Minecraft mc) {
         if (!PRESET.isEmpty()) {
-            // Said out loud rather than ignored: a run flown with the wrong
-            // settings and a run flown with the right ones look identical in
-            // the log, and only one of them means anything.
-            VulkanModNext.LOGGER.warn("Flight {} was asked for preset '{}', and this port has no "
-                    + "presets — flying with whatever the config file holds", TAG, PRESET);
+            Presets.Preset found = null;
+            for (Presets.Preset preset : Presets.ALL) {
+                if (preset.name.replace(" ", "").equalsIgnoreCase(PRESET.replace(" ", ""))) {
+                    found = preset;
+                }
+            }
+            if (found != null) {
+                found.apply();
+                VulkanModNext.LOGGER.info("Flight {} flying preset {}", TAG, found.name);
+            } else {
+                // Said out loud rather than ignored: a run flown with the wrong
+                // settings and a run flown with the right ones look identical
+                // in the log, and only one of them means anything.
+                VulkanModNext.LOGGER.warn("Flight {} was asked for preset '{}', which does not "
+                        + "exist — flying with whatever the config file holds", TAG, PRESET);
+            }
         }
         // Focus is not a thing an unattended run can promise, and a game that
         // pauses when the window loses it would flat-line halfway through.
