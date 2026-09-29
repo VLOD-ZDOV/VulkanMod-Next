@@ -104,6 +104,13 @@ public final class TerrainFrame {
             return false;
         }
         java.util.List<?> visible = ((WorldRendererAccess) renderer).vulkanmodnext$visibleChunks();
+        // Every section on screen, or only those holding something: the walk
+        // below skips an empty one either way, so the two lists draw the same
+        // chunks in the same order, and the second is a sixth as long.
+        if (CpuSavings.shortLayerSections) {
+            visible = ShortSections.of(visible);
+        }
+        CpuSavings.countLayerWalk(visible.size());
         int count = 0;
         int at = 0;
         int empty = 0;
