@@ -2695,10 +2695,20 @@ final class VkTerrainRenderer {
             fence = fences[slot];
             long t0 = System.nanoTime();
             check(vkWaitForFences(device(), fence, true, 1_000_000_000L), "vkWaitForFences");
+            // The translucent pass of that same earlier frame as well. It is a
+            // separate submission, made later in the frame than the opaque one,
+            // so the opaque fence says nothing about it — and everything below
+            // frees retired geometry and rewrites this slot's uniforms, both of
+            // which that pass reads. Without this wait a late translucent pass
+            // read freed memory: the same shape as the MMU faults this renderer
+            // has already had twice.
+            check(vkWaitForFences(device(), translucentFences[slot], true, 1_000_000_000L),
+                    "vkWaitForFences(translucent, frame start)");
             fenceWaitNanos += System.nanoTime() - t0;
             vkResetFences(device(), fence);
             readGpuTimestamps(stack, slot);
-            // This slot's fence covers frame N-2; everything up to it is done
+            // Both of this slot's fences cover frame N-2 now; everything up to
+            // it is done
             mirror.setFrameStamp(frameCounter);
             mirror.flushRetired(frameCounter - framesInFlight);
             ensureQuadIndexCapacity(mirror.maxEntrySize() / VertexLayout.stride() / 4);
@@ -3075,6 +3085,13 @@ final class VkTerrainRenderer {
      * once if it is ever untrue.
      */
     private boolean frameSignalled;
+
+    /**
+     * OpenGL has signalled the opaque semaphore and no Vulkan submission has
+     * waited on it yet. Kept across a resize on purpose: the semaphore is, and
+     * so is the signal it carries.
+     */
+    private boolean glSignalPending;
     private boolean pairingWarned;
 
     private void submitFrame() {
@@ -3110,7 +3127,14 @@ final class VkTerrainRenderer {
                 // what to wait for, see setFenceValue.
                 signalFenceValue++;
             }
-            if (!firstFrame && SHARED_SEMAPHORES) {
+            // Waited on exactly when OpenGL has signalled and nothing has
+            // consumed it yet — not "on every frame but the first". A resize
+            // rebuilds the targets and sets firstFrame again, but not the
+            // semaphore, which still carries the last composite's signal; the
+            // old gate skipped the wait, the next composite signalled an
+            // already-signalled binary semaphore, and every later wait consumed
+            // the frame before it. See the 1.12.2 twin for the full story.
+            if (glSignalPending && SHARED_SEMAPHORES) {
                 submit.waitSemaphoreCount(1)
                         .pWaitSemaphores(stack.longs(vkWaitSemaphore))
                         .pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT));
@@ -3118,6 +3142,9 @@ final class VkTerrainRenderer {
             firstFrame = false;
             firstFrameStage("submitting the opaque frame");
             check(vkQueueSubmit(ctx.getGraphicsQueue(), submit, fence), "vkQueueSubmit(terrain)");
+            if (SHARED_SEMAPHORES) {
+                glSignalPending = false;
+            }
             if (!SHARED_SEMAPHORES) {
                 // Nothing will tell OpenGL when these images are finished, so
                 // finishing them here is the only ordering left.
@@ -3765,6 +3792,7 @@ final class VkTerrainRenderer {
             waitFenceValue++;
             setFenceValue(glSignalSemaphore, waitFenceValue);
             EXTSemaphore.glSignalSemaphoreEXT(glSignalSemaphore, noBuffers, textures, layouts);
+            glSignalPending = true;
             GL11C.glFlush();
         }
     }
@@ -3903,7 +3931,9 @@ final class VkTerrainRenderer {
                 return false;
             }
             translucentWaitNanos += waitNanos;
-            check(vkResetFences(device(), translucentFences[slot]), "vkResetFences(translucent)");
+            // Not reset here: see the submit below. The start of every frame
+            // now waits on this fence too, so it must never be left unsignalled
+            // by a pass that threw between here and its submission.
 
             // Both the buffer this writes and the index buffer it may resize
             // are read by the commands recorded below, so it goes before the
@@ -3991,6 +4021,9 @@ final class VkTerrainRenderer {
                     .pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT))
                     .pSignalSemaphores(stack.longs(vkTranslucentSignalSemaphore));
             translucentSignalFenceValue++;
+            // Reset immediately before the submission that signals it, with
+            // nothing that can throw in between: beginFrame waits on it too.
+            check(vkResetFences(device(), translucentFences[slot]), "vkResetFences(translucent)");
             check(vkQueueSubmit(ctx.getGraphicsQueue(), submit, translucentFences[slot]),
                     "vkQueueSubmit(translucent)");
         }
@@ -4407,6 +4440,7 @@ final class VkTerrainRenderer {
                 waitFenceValue++;
                 setFenceValue(glSignalSemaphore, waitFenceValue);
                 EXTSemaphore.glSignalSemaphoreEXT(glSignalSemaphore, noBuffers, textures, layouts);
+                glSignalPending = true;
                 GL11C.glFlush();
             } else {
                 // The next Vulkan frame writes these images with nothing told
