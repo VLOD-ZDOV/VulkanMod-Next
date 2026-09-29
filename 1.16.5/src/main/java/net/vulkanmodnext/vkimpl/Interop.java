@@ -525,7 +525,7 @@ final class Interop {
                     "vkGetMemoryWin32HandleKHR");
             EXTMemoryObjectWin32.glImportMemoryWin32HandleEXT(memObj, size,
                     EXTMemoryObjectWin32.GL_HANDLE_TYPE_OPAQUE_WIN32_EXT, pHandle.get(0));
-            retainHandle(pHandle.get(0));
+            retainMemoryHandle(memObj, pHandle.get(0));
         } else {
             VkMemoryGetFdInfoKHR info = VkMemoryGetFdInfoKHR.callocStack(stack)
                     .sType(KHRExternalMemoryFd.VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR)
@@ -660,8 +660,51 @@ final class Interop {
                 + (CLOSE_EARLY ? " (closing early, for the Windows/AMD experiment)" : "");
     }
 
+    /**
+     * Memory handles, by the GL memory object that imported each one. Kept
+     * apart from {@link #RETAINED} because memory does not live as long as the
+     * device: the shared targets are rebuilt on every resize, and holding their
+     * handles until teardown kept every one of them alive. See the 1.12.2 twin.
+     */
+    private static final java.util.Map<Integer, Long> MEMORY_HANDLES = new java.util.HashMap<>();
+
+    private static void retainMemoryHandle(int memObj, long handle) {
+        if (handle == 0L) {
+            return;
+        }
+        if (CLOSE_EARLY) {
+            closeHandle(handle);
+            return;
+        }
+        synchronized (MEMORY_HANDLES) {
+            MEMORY_HANDLES.put(Integer.valueOf(memObj), Long.valueOf(handle));
+            retainedEver++;
+        }
+    }
+
+    /**
+     * Closes the handle a GL memory object was imported from. Only after that
+     * object is deleted and OpenGL has finished with it (glFinish). Nothing to
+     * do off Windows: a file descriptor is consumed by its import.
+     */
+    static void releaseMemoryHandle(int memObj) {
+        Long handle;
+        synchronized (MEMORY_HANDLES) {
+            handle = MEMORY_HANDLES.remove(Integer.valueOf(memObj));
+        }
+        if (handle != null) {
+            closeHandle(handle.longValue());
+        }
+    }
+
     /** Closes everything {@link #retainHandle} kept. Called at device teardown. */
     static void releaseImportedHandles() {
+        synchronized (MEMORY_HANDLES) {
+            for (Long handle : MEMORY_HANDLES.values()) {
+                closeHandle(handle.longValue());
+            }
+            MEMORY_HANDLES.clear();
+        }
         synchronized (RETAINED) {
             if (!RETAINED.isEmpty()) {
                 LOGGER.info("Closing {} exported handle(s) held for the driver", RETAINED.size());
