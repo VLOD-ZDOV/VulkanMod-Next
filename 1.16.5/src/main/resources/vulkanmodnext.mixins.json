@@ -42,7 +42,8 @@
     "FrustumTestMixin",
     "BuildNearOffThreadMixin",
     "BuildNearTimingMixin",
-    "EntitySectionsMixin"
+    "EntitySectionsMixin",
+    "ChunkPreloadMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }
