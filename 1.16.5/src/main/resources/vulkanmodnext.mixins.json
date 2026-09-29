@@ -23,7 +23,9 @@
     "TerrainDrawMixin",
     "WorldRendererAccess",
     "VertexBufferMixin",
-    "VertexBufferUploadMixin"
+    "VertexBufferUploadMixin",
+    "WeatherDisplayMixin",
+    "WorldTimeDisplayMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }
