@@ -25,6 +25,10 @@ package net.vulkanmodnext.client;
 public final class CpuSavings {
 
     public static boolean fastFrustumTest;
+    public static boolean shortLayerSections;
+
+    /** Visible-list entries the Vulkan terrain draw walked, all layers together. */
+    private static long layerWalked;
 
     /** Boxes tested against the frustum, and how many of those this mod answered. */
     private static long frustumTests;
@@ -40,6 +44,12 @@ public final class CpuSavings {
     /** Called at the top of {@code renderLevel}, before the visibility search. */
     public static void beginFrame() {
         fastFrustumTest = VulkanConfig.on("fastFrustumTest");
+        shortLayerSections = VulkanConfig.on("shortLayerSections");
+        ShortSections.beginFrame();
+    }
+
+    public static void countLayerWalk(int entries) {
+        layerWalked += entries;
     }
 
     public static void countFrustumTest(boolean answered) {
@@ -57,6 +67,7 @@ public final class CpuSavings {
     public static String stats() {
         return "cpu savings: frustum tests " + frustumTests + " (" + frustumAnswered
                 + " by the far corner), chunks built on the render thread " + syncBuilds
-                + " (" + syncBuildNanos / 1000000L + " ms)";
+                + " (" + syncBuildNanos / 1000000L + " ms), terrain layer walk " + layerWalked
+                + " entries; " + ShortSections.stats();
     }
 }
