@@ -93,6 +93,16 @@ public final class EntityCapture {
     /** The frame of the creature being drawn, and one frame per skeleton level. */
     private static final float[][] STACK = new float[MAX_DEPTH][16];
     private static int depth;
+    /**
+     * Whether each {@link #beginPart} still waiting for its {@link #endPart}
+     * pushed a frame, one entry per nested call.
+     *
+     * A part past the depth limit, or one that threw before its push, pushes
+     * nothing — and its end used to pop the parent's frame regardless, so every
+     * sibling after it was placed one level too shallow.
+     */
+    private static final boolean[] PUSHED = new boolean[64];
+    private static int calls;
     private static final float[] LOCAL = new float[16];
     private static final float[] COMPOSED = new float[16];
 
@@ -195,6 +205,7 @@ public final class EntityCapture {
         }
         armed = false;
         depth = 0;
+        calls = 0;
         frameParts = 0;
         frameQuads = 0;
         frameTextures = 0;
@@ -222,6 +233,7 @@ public final class EntityCapture {
         long start = System.nanoTime();
         try {
             depth = 0;
+            calls = 0;
             readMatrix(STACK[0]);
             matrixReads++;
         } catch (Throwable ignored) {
@@ -242,6 +254,7 @@ public final class EntityCapture {
         if (!armed || part == null) {
             return;
         }
+        int before = depth;
         try {
             if (depth >= MAX_DEPTH - 1) {
                 return;
@@ -291,6 +304,11 @@ public final class EntityCapture {
             }
         } catch (Throwable ignored) {
             // As above.
+        } finally {
+            if (calls < PUSHED.length) {
+                PUSHED[calls] = depth != before;
+            }
+            calls++;
         }
     }
 
@@ -330,7 +348,11 @@ public final class EntityCapture {
 
     /** Leaves the part's frame, so its siblings are placed beside it and not inside it. */
     public static void endPart() {
-        if (armed && depth > 0) {
+        if (!armed || calls == 0) {
+            return;
+        }
+        calls--;
+        if (calls < PUSHED.length && PUSHED[calls] && depth > 0) {
             depth--;
         }
     }
@@ -424,7 +446,7 @@ public final class EntityCapture {
      *
      * Every matrix in this chain is a rotation and a shift, so the fourth row
      * is known and the fourth column of the product is the only one that needs
-     * the shift added. Twenty-seven multiplications instead of sixty-four, on
+     * the shift added. Thirty-six multiplications instead of sixty-four, on
      * the one piece of arithmetic that runs once per bone of every creature on
      * screen.
      */

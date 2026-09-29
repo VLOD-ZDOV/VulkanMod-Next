@@ -113,9 +113,15 @@ public final class RenderNotice {
         mc.ingameGUI.getChatGUI().printChatMessage(new TextComponentString(line));
     }
 
-    /** A fresh world may well succeed where the last one failed. */
+    /**
+     * A fresh world may well succeed where the last one failed.
+     *
+     * A notice still waiting is kept. The world-load event fires before the
+     * player exists, so a failure queued at startup — the Vulkan side never
+     * coming up at all — is always still pending here, and clearing it threw
+     * away the one message that case has.
+     */
     public static void reset() {
         told = false;
-        pending = null;
     }
 }

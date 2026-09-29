@@ -393,7 +393,7 @@ public final class VulkanContextImpl implements VulkanBridge {
                 // The extension count is here because it is what sizes the
                 // scratch stack this very startup nearly ran out of, and a log
                 // that reports it turns the next such report into one line
-                // instead of a guess. See Lwjgl3Natives.DEFAULT_STACK_SIZE_KB.
+                // instead of a guess. See VulkanLoader.DEFAULT_STACK_SIZE_KB.
                 IntBuffer extensions = stack.mallocInt(1);
                 vkEnumerateDeviceExtensionProperties(candidate, (String) null, extensions, null);
                 LOGGER.info("GPU {}: {} ({}, Vulkan {}, {} extensions, score {}{})",

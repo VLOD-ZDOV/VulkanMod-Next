@@ -140,10 +140,13 @@ public final class BlockLightSources {
         shift(viewX, viewY, viewZ);
         long now = System.nanoTime();
         if (!sweeping) {
+            // Measured from where the last sweep started, not from lastX: shift()
+            // above has just moved lastX to this frame's camera, so comparing
+            // against it measured one frame's motion and never fired.
             boolean moved = Double.isNaN(lastX)
-                    || Math.abs(viewX - lastX) > MOVED
-                    || Math.abs(viewY - lastY) > MOVED
-                    || Math.abs(viewZ - lastZ) > MOVED;
+                    || Math.abs(viewX - buildX) > MOVED
+                    || Math.abs(viewY - buildY) > MOVED
+                    || Math.abs(viewZ - buildZ) > MOVED;
             if (!moved && now - lastScanNanos < INTERVAL_NANOS) {
                 return;
             }
@@ -162,6 +165,19 @@ public final class BlockLightSources {
             lastScanNanos = now;
         }
         stepSweep(viewX, viewY, viewZ);
+    }
+
+    /**
+     * Drops everything found in the world being left.
+     *
+     * The list is positions relative to the camera, so after a change of
+     * dimension it would light the new world with the old one's torches until
+     * the next sweep finished.
+     */
+    public static void forget() {
+        count = 0;
+        sweeping = false;
+        lastX = Double.NaN;
     }
 
     /**
