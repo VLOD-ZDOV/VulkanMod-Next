@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+### 1.16.5 port
+
+The 1.16.5 build catches up: from 43 of the 1.12.2 build's 106 settings doing
+something to 69. Every one marked working was turned to both ends in the same
+flight and the two frames compared; the ones that could not be shown that way
+are still marked "not yet ported" in the menu.
+
+- **Added: presets.** Stable, Balanced, Performance, Potato, Beautiful, Golden
+  Hour, Cold Front and Soft Film, with the same values as on 1.12.2, on a tab of
+  their own. Number settings are sliders now instead of a hundred clicks.
+- **Added: material tags.** The terrain shader now knows water, leaves, plants,
+  glass, ice and lava apart, which turns on leaf glow, leaf shadows, water
+  waves, caustics, reflections and wet surfaces.
+- **Added: bloom, ambient occlusion and the tone pass over the finished frame.**
+  They were on the Vulkan side and nothing called them.
+- **Fixed: water, lava, fire and every other animated block stood still when
+  drawn through Vulkan.** The animation frames never reached the renderer's copy
+  of the block atlas.
+- **Added:** dynamic lights (held and dropped light sources, burning mobs),
+  fog switch and fog distance, time and weather control, round sun, sun size,
+  cloud tint, frame graph, diagnostics file, render distance up to 128, chunk
+  build threads, animated textures switch, vanilla buffer drop, and handing
+  water and glass back to the game.
+- **Ported but not yet shown working, so still greyed in the menu:** zoom,
+  background frame cap, entity and block entity distance, explosion particle
+  budget, update check, near plane, moon size and roundness, sun warmth.
+- Ray tracing and the settings built on it are labelled as impossible on this
+  version rather than "not yet": the game's own Vulkan bindings predate it.
+
 ## [0.10.0-alpha.6]
 
 The sixth alpha. Five reviewers read the renderer's synchronization, the
