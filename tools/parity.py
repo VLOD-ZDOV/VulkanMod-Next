@@ -32,7 +32,7 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The original, whose settings every other port is measured against, and then
 # the ports. Each is (name, path, how to read it).
 ORIGINAL = "1.12.2"
-PORTS = ["1.16.5", "1.21.11"]
+PORTS = ["1.16.5"]
 
 ORIGINAL_FILE = "src/main/java/net/vulkanmodnext/client/VulkanConfig.java"
 PORT_FILE = "src/main/java/net/vulkanmodnext/client/Settings.java"
