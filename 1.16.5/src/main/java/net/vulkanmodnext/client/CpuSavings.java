@@ -30,6 +30,10 @@ public final class CpuSavings {
     private static long frustumTests;
     private static long frustumAnswered;
 
+    /** Chunks the render thread built itself, and the time it waited for them. */
+    private static long syncBuilds;
+    private static long syncBuildNanos;
+
     private CpuSavings() {
     }
 
@@ -45,8 +49,14 @@ public final class CpuSavings {
         }
     }
 
+    public static void countSyncBuild(long nanos) {
+        syncBuilds++;
+        syncBuildNanos += nanos;
+    }
+
     public static String stats() {
         return "cpu savings: frustum tests " + frustumTests + " (" + frustumAnswered
-                + " by the far corner)";
+                + " by the far corner), chunks built on the render thread " + syncBuilds
+                + " (" + syncBuildNanos / 1000000L + " ms)";
     }
 }

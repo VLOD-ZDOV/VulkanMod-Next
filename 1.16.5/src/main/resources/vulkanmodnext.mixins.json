@@ -39,7 +39,9 @@
     "ChunkBuildThreadsMixin",
     "ChunkBuilderExecutorMixin",
     "AnimatedTexturesMixin",
-    "FrustumTestMixin"
+    "FrustumTestMixin",
+    "BuildNearOffThreadMixin",
+    "BuildNearTimingMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }
