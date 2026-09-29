@@ -123,6 +123,11 @@ final class VkChunkMirror {
         return materialBuffer;
     }
 
+    /** How many bytes the geometry buffer actually has, for readers that must stay inside it. */
+    synchronized long geometryCapacity() {
+        return geometryCapacity;
+    }
+
     synchronized long geometryBuffer() {
         return geometryBuffer;
     }
