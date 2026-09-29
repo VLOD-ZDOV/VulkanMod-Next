@@ -175,6 +175,17 @@ public final class Flight {
     private static final boolean PAIRS =
             Boolean.parseBoolean(System.getProperty("vulkanmodnext.flightPairs", "false"));
 
+    /**
+     * An item to put in the player's main hand, as {@code minecraft:torch}, or
+     * empty for an empty hand.
+     *
+     * What makes a light source appear in a route that has none: the flight
+     * stands in an empty world, and dynamic lights have nothing to show without
+     * something carried. Put in the hand on the server, which owns the
+     * inventory, so the client sees it the way it would see a real one.
+     */
+    private static final String HOLD = System.getProperty("vulkanmodnext.flightHold", "").trim();
+
     /** Named so the run says out loud that this version cannot honour it. */
     private static final String PRESET = System.getProperty("vulkanmodnext.flightPreset", "").trim();
 
@@ -416,6 +427,7 @@ public final class Flight {
         }
         VulkanModNext.LOGGER.info("Flight {} in the world at {} {} {}, settling {}s",
                 TAG, (int) baseX, (int) baseY, (int) baseZ, SETTLE);
+        holdItem(mc);
         stage = Stage.SETTLING;
         ticks = 0;
     }
@@ -465,6 +477,33 @@ public final class Flight {
                 level.setWeatherParameters(0, Integer.MAX_VALUE, true, true);
             }
         });
+    }
+
+    /** Puts {@link #HOLD} in the main hand, once, on the server thread. */
+    private static void holdItem(Minecraft mc) {
+        if (HOLD.isEmpty()) {
+            return;
+        }
+        net.minecraft.item.Item item = Registry.ITEM.get(new net.minecraft.util.ResourceLocation(HOLD));
+        if (item == net.minecraft.item.Items.AIR) {
+            // Said rather than flown: a run meant to show a carried light and
+            // flown with an empty hand looks exactly like a light that failed.
+            VulkanModNext.LOGGER.warn("Flight {} was asked to hold '{}', which is not an item; "
+                    + "the hand stays empty", TAG, HOLD);
+            return;
+        }
+        net.minecraft.server.integrated.IntegratedServer server = mc.getSingleplayerServer();
+        if (server == null) {
+            return;
+        }
+        server.execute(() -> {
+            for (net.minecraft.entity.player.ServerPlayerEntity player
+                    : server.getPlayerList().getPlayers()) {
+                player.setItemInHand(net.minecraft.util.Hand.MAIN_HAND,
+                        new net.minecraft.item.ItemStack(item));
+            }
+        });
+        VulkanModNext.LOGGER.info("Flight {} holds {}", TAG, HOLD);
     }
 
     /**
