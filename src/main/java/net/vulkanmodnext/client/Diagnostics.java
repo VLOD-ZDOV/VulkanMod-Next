@@ -177,7 +177,7 @@ public final class Diagnostics {
             return;
         }
         StringBuilder line = new StringBuilder()
-                .append('[').append(STAMP.format(new Date())).append("] ")
+                .append('[').append(stamp()).append("] ")
                 .append(event.getLevel()).append(' ')
                 .append(name).append(": ")
                 .append(event.getMessage().getFormattedMessage());
@@ -250,11 +250,30 @@ public final class Diagnostics {
         try {
             PrintWriter out = open();
             if (out != null) {
-                out.println("[" + STAMP.format(new Date()) + "] EVENT: " + reason);
-                out.flush();
+                // Under the lock, and after any folded run is written out:
+                // mirrored lines arrive from other threads, and an event line
+                // written between a run and its "repeated" summary reads as
+                // though it happened before the lines it followed.
+                synchronized (LOCK) {
+                    flushRepeat();
+                    out.println("[" + stamp() + "] EVENT: " + reason);
+                    out.flush();
+                }
             }
         } catch (Throwable ignored) {
             // Diagnostics must never be the reason something breaks.
+        }
+    }
+
+    /**
+     * The time of day for a line. {@code SimpleDateFormat} keeps its working
+     * state in the instance, and mirrored log lines are formatted on whichever
+     * thread logged them — chunk builders included — so it is never used
+     * unguarded.
+     */
+    private static String stamp() {
+        synchronized (STAMP) {
+            return STAMP.format(new Date());
         }
     }
 
@@ -516,7 +535,7 @@ public final class Diagnostics {
 
     private static void writeSnapshot(PrintWriter out) {
         Minecraft mc = Minecraft.getMinecraft();
-        out.println("[" + STAMP.format(new Date()) + "] snapshot");
+        out.println("[" + stamp() + "] snapshot");
         out.println("  fps: " + Minecraft.getDebugFPS()
                 + ", world: " + (mc.world == null ? "none" : "loaded")
                 + ", gui: " + (mc.currentScreen == null ? "none" : mc.currentScreen.getClass().getSimpleName()));

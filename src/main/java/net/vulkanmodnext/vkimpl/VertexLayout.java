@@ -361,10 +361,13 @@ public final class VertexLayout {
      * both ends of the range be trimmed in the same frame — the quads under the
      * camera and the ones over it are different quads.
      *
-     * @param quadGroup scratch, one byte per quad, at least {@code sourceBytes / 112} long
+     * @param quadShelf scratch, one byte per quad, at least {@code sourceBytes / 112} long
+     * @param quadTarget filled with each source quad's position in the sorted
+     *                   output, at least {@code sourceBytes / 112} long
      * @param counts filled with the down and up vertex counts, then 17 running
-     *               totals of down-facing quads below each block level and 17
-     *               of up-facing quads at or above it
+     *               totals of down-facing quads below each block level, 17
+     *               of up-facing quads at or above it, and the five side-shelf
+     *               quad offsets at {@link #SIDE_TABLE}
      * @return false if the geometry could not be grouped and was left alone
      */
     public static boolean copyGrouped(long source, long destination, int sourceBytes,
@@ -381,10 +384,11 @@ public final class VertexLayout {
         // low to high, so the ones under a camera are a prefix of the range.
         // Shelf 16 holds the down-facing quads that sit outside those levels
         // and may never be skipped, and it comes after them for that reason:
-        // put first, as it was at first, the prefix skip eats it. Shelf 17 is
-        // everything facing neither way. Shelf 18 is the up-facing quads
-        // outside the levels, before 19..34, which are the levels low to high,
-        // so the ones over a camera are a suffix.
+        // put first, as it was at first, the prefix skip eats it. Shelves
+        // 17..20 are the four sideways facings and shelf 21 is everything
+        // facing no axis. Shelf 22 is the up-facing quads outside the levels,
+        // before 23..38, which are the levels low to high, so the ones over a
+        // camera are a suffix.
         int[] tally = SHELF_TALLY.get();
         java.util.Arrays.fill(tally, 0);
         for (int q = 0; q < quads; q++) {
@@ -546,11 +550,6 @@ public final class VertexLayout {
     }
 
     /**
-     * Reads and resets the three counts that say whether the packing is honest.
-     * All three are meant to stay at zero, and a report that never shows them
-     * is a report that cannot tell anybody it went wrong.
-     */
-    /**
      * Counts one chunk layer's quads by which way they face.
      *
      * Accumulated locally and published once for the whole layer: a counter
@@ -608,6 +607,11 @@ public final class VertexLayout {
         }
     }
 
+    /**
+     * Reads and resets the three counts that say whether the packing is honest.
+     * All three are meant to stay at zero, and a report that never shows them
+     * is a report that cannot tell anybody it went wrong.
+     */
     public static String stats() {
         String line = "vertex layout: " + reason
                 + (atlasPixels > 0 ? ", atlas " + atlasPixels + " px" : "");

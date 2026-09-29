@@ -102,10 +102,10 @@ public class VulkanCorePlugin implements IFMLLoadingPlugin, IEarlyMixinLoader {
         // vanilla. That works, and it is a great deal of transformed bytecode
         // to arrive at the picture the game would have drawn anyway — on the
         // one class of device where the game can least afford it.
-        String architecture = Platform.unsupportedArchitecture();
-        if (architecture != null) {
+        String platform = Platform.unsupportedPlatform();
+        if (platform != null) {
             System.out.println("[VulkanModNext] This mod carries its Vulkan renderer for 64-bit x86"
-                    + " only and this machine is " + architecture + ", so the renderer is not"
+                    + " desktops only and this machine is " + platform + ", so the renderer is not"
                     + " loaded and the world is drawn the way it always was. The settings and the"
                     + " game-side optimisations stay available.");
             return configs;
@@ -244,7 +244,7 @@ public class VulkanCorePlugin implements IFMLLoadingPlugin, IEarlyMixinLoader {
             out.write("# It is for renderers that came out after this build did. These are\n");
             out.write("# already known and do not need a line: optifine, shadersmod,\n");
             out.write("# celeritas, actinium, nothirium, vulcanizator, vintagium, relictium,\n");
-            out.write("# neonium, magnesium.\n");
+            out.write("# neonium.\n");
             out.write("#\n");
             out.write("# Anything after a # is ignored. Blank lines are ignored.\n");
             out.write("# To go the other way and load this renderer anyway, start the game\n");

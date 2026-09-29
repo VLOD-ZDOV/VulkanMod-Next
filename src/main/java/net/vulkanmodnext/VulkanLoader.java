@@ -29,7 +29,7 @@ public final class VulkanLoader {
     /**
      * Volatile so that reading it needs no monitor.
      *
-     * It is written once, inside the synchronized constructor below, and read
+     * It is written once, inside the synchronized bridge() below, and read
      * from the render thread several times a frame and from chunk-building
      * threads besides. A monitor was being taken for each of those reads, on a
      * field that never changes again after the one write; volatile gives the
@@ -107,7 +107,7 @@ public final class VulkanLoader {
      *
      * LWJGL's own default of 64 KiB holds 252 entries, and current drivers list
      * around 270 for a single card — machines have failed to start over a
-     * shortfall of three kilobytes. 2 MiB is 8064 entries, twenty-nine drivers'
+     * shortfall of three kilobytes. 2 MiB is 8065 entries, twenty-nine drivers'
      * worth, which is room for whatever a multi-GPU machine with overlay layers
      * turns out to list.
      *
@@ -158,6 +158,15 @@ public final class VulkanLoader {
             if (Boolean.getBoolean("vulkanmodnext.forceFallback")) {
                 throw new VulkanUnavailableException("Vulkan renderer switched off by vulkanmodnext.forceFallback");
             }
+            String platform = net.vulkanmodnext.core.Platform.unsupportedPlatform();
+            if (platform != null) {
+                throw new VulkanUnavailableException("This mod ships its Vulkan half with native"
+                        + " libraries for 64-bit x86 desktops only, and this machine is " + platform + ". Nothing"
+                        + " here can load, so the game renders on OpenGL as it always did."
+                        + " Phones and tablets running Minecraft Java through a translation layer"
+                        + " land here: the world is drawn by that layer, and everything this mod"
+                        + " does besides the renderer still works.");
+            }
             int java = javaFeatureVersion();
             int ceiling = maxSupportedJava();
             if (java > ceiling) {
@@ -168,15 +177,6 @@ public final class VulkanLoader {
                         + " If you want to try it anyway, start the game with"
                         + " -Dvulkanmodnext.javaCeiling=" + java + " — what decides this is the JNI version"
                         + " rather than the Java one, and it moves far more rarely.");
-            }
-            String arch = net.vulkanmodnext.core.Platform.unsupportedArchitecture();
-            if (arch != null) {
-                throw new VulkanUnavailableException("This mod ships its Vulkan half with native"
-                        + " libraries for 64-bit x86 only, and this machine is " + arch + ". Nothing"
-                        + " here can load, so the game renders on OpenGL as it always did."
-                        + " Phones and tablets running Minecraft Java through a translation layer"
-                        + " land here: the world is drawn by that layer, and everything this mod"
-                        + " does besides the renderer still works.");
             }
             reserveStackSpace();
             try {

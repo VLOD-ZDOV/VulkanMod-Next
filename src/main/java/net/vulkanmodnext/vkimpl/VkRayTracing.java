@@ -77,7 +77,6 @@ final class VkRayTracing {
 
     private static final Logger LOGGER = LogManager.getLogger("VulkanModNext/RayTracing");
 
-    /** Vertex stride of the mirrored chunk geometry, positions first. */
     /**
      * Creature geometry, which is captured whole and never packed.
      *
@@ -186,6 +185,10 @@ final class VkRayTracing {
         float x;
         float y;
         float z;
+        /** The chunk's own world origin, so it can be placed again unseen. */
+        double worldX;
+        double worldY;
+        double worldZ;
         long touchedFrame;
         /**
          * Whether the geometry this was built from is the packed sixteen-byte
@@ -336,6 +339,9 @@ final class VkRayTracing {
             blas.x = (float) dx;
             blas.y = (float) dy;
             blas.z = (float) dz;
+            blas.worldX = chunks[c * 4 + 1];
+            blas.worldY = chunks[c * 4 + 2];
+            blas.worldZ = chunks[c * 4 + 3];
             blas.touchedFrame = frameIndex;
             blas.packed = VertexLayout.isCompact();
             blas.kind = c < solidCount ? KIND_SOLID
@@ -359,6 +365,32 @@ final class VkRayTracing {
             }
         }
 
+        // And what is near but not on screen. The list above is what the camera
+        // can see, and a shadow is cast by what the sun can see: a tree behind
+        // the player, an overhang above the view. Left out, those cast nothing,
+        // and shadows popped in and out and ended at the edge of the screen as
+        // the camera turned. Structures kept from earlier frames are placed
+        // again where their chunk stood; they are not rebuilt, so a chunk
+        // changed while out of sight keeps its old shadow until it is seen.
+        for (Blas blas : structures.values()) {
+            if (live.size() >= maxStructures) {
+                break;
+            }
+            if (blas.touchedFrame == frameIndex || blas.structure == 0) {
+                continue;
+            }
+            double dx = blas.worldX - viewX;
+            double dy = blas.worldY - viewY;
+            double dz = blas.worldZ - viewZ;
+            if (dx * dx + dy * dy + dz * dz > (double) radius * radius) {
+                continue;
+            }
+            blas.x = (float) dx;
+            blas.y = (float) dy;
+            blas.z = (float) dz;
+            live.add(blas);
+        }
+
         dropUntouched(frameIndex);
 
         // The creatures, if there are any and there is room for one more.
@@ -378,9 +410,9 @@ final class VkRayTracing {
         // budget. In all three the mob would otherwise stand on nothing at all.
         creaturesInStructure = creatures;
         if (creatures) {
-            creatureBlas.x = 0.0f;
-            creatureBlas.y = 0.0f;
-            creatureBlas.z = 0.0f;
+            creatureBlas.x = creatureShiftX;
+            creatureBlas.y = creatureShiftY;
+            creatureBlas.z = creatureShiftZ;
             creatureBlas.touchedFrame = frameIndex;
             // Opaque, and deliberately: a skin is opaque wherever it is drawn
             // at all, and letting a ray through it at random would give a mob
@@ -402,7 +434,10 @@ final class VkRayTracing {
                 buildOne(stack, creatureBlas, creatureAddress);
             }
             int instances = writeInstances(stack);
-            if (instances > 0) {
+            // Rebuilt even when empty once this slot has a structure: left
+            // alone, it would go on naming bottom-level structures that are
+            // retired and then freed while the shader still traces through it.
+            if (instances > 0 || topLevel(activeSlot) != 0) {
                 buildTopLevel(stack, instances);
             }
             lastInstances = instances;
@@ -585,10 +620,15 @@ final class VkRayTracing {
             MemoryUtil.memPutFloat(at + 36, 0.0f);
             MemoryUtil.memPutFloat(at + 40, scale);
             MemoryUtil.memPutFloat(at + 44, blas.z + shift);
-            // instanceCustomIndex 24 bits, mask 8 bits: visible to every ray.
-            // The low bits carry what this structure is made of, which is how
-            // the shader knows whether it may see through what it just hit.
-            MemoryUtil.memPutInt(at + 48, 0xFF000000 | (blas.kind & 0xFFFFFF));
+            // instanceCustomIndex 24 bits, mask 8 bits. The low bits carry what
+            // this structure is made of, which is how the shader knows whether
+            // it may see through what it just hit. Plants are masked out of the
+            // shadow rays (which ask for mask 1): a ray cannot read the texture,
+            // so a tuft of grass stopped light over its whole square quad and
+            // threw a square shadow. They stay in the structure under their own
+            // bit for anything that wants them.
+            int mask = blas.kind == KIND_CUTOUT ? 0x02 : 0x01;
+            MemoryUtil.memPutInt(at + 48, (mask << 24) | (blas.kind & 0xFFFFFF));
             // shaderBindingTableRecordOffset 24 bits, flags 8 bits.
             MemoryUtil.memPutInt(at + 52, 0);
             MemoryUtil.memPutLong(at + 56, blas.address);
@@ -948,6 +988,17 @@ final class VkRayTracing {
         return creaturesInStructure;
     }
 
+    private float creatureShiftX;
+    private float creatureShiftY;
+    private float creatureShiftZ;
+
+    /** From where the creatures were drawn to where the view is now. */
+    void setCreatureShift(float x, float y, float z) {
+        creatureShiftX = x;
+        creatureShiftY = y;
+        creatureShiftZ = z;
+    }
+
     void setCreatureGeometry(long buffer, long byteOffset, int vertexCount) {
         this.creatureAddress = buffer == 0 ? 0L : bufferAddress(buffer);
         this.creatureOffset = byteOffset;
@@ -1036,10 +1087,19 @@ final class VkRayTracing {
         if (tlas != null && tlas.length >= slotCount) {
             return;
         }
-        tlas = new long[slotCount];
-        tlasBuffer = new long[slotCount];
-        tlasMemory = new long[slotCount];
-        tlasCapacity = new long[slotCount];
+        // Grown rather than replaced: the structures already in the old
+        // arrays are still live, and dropping them would leak them.
+        if (tlas == null) {
+            tlas = new long[slotCount];
+            tlasBuffer = new long[slotCount];
+            tlasMemory = new long[slotCount];
+            tlasCapacity = new long[slotCount];
+            return;
+        }
+        tlas = java.util.Arrays.copyOf(tlas, slotCount);
+        tlasBuffer = java.util.Arrays.copyOf(tlasBuffer, slotCount);
+        tlasMemory = java.util.Arrays.copyOf(tlasMemory, slotCount);
+        tlasCapacity = java.util.Arrays.copyOf(tlasCapacity, slotCount);
     }
 
     private void retireTopLevel(int slot) {
@@ -1069,12 +1129,15 @@ final class VkRayTracing {
         entry.bytes = blas.bytes;
         entry.frame = frameIndex;
         retired.add(entry);
+        // sourceOffset/Size/Version are left alone: buildOne retires the old
+        // structure after they were set for the new build, and clearing the
+        // size here made every chunk look stale again the following frame.
+        // A zero structure already marks a Blas as needing a build.
         blas.structure = 0;
         blas.buffer = 0;
         blas.memory = 0;
         blas.address = 0;
         blas.bytes = 0;
-        blas.sourceSize = 0;
     }
 
     /**

@@ -44,10 +44,25 @@ public final class RenderDistanceLimit {
     /** What the switch unlocks. */
     public static final int EXTREME = 128;
 
+    /**
+     * Phones keep vanilla's own ceiling. The grid above is allocated whatever
+     * draws it, and on Android there is no Vulkan renderer to draw it at all —
+     * only a translation layer and a heap of a gigabyte or two, where a slider
+     * that reaches 64 is a slider that reaches an out-of-memory crash.
+     */
+    private static final boolean ANDROID = net.vulkanmodnext.core.Platform.android();
+
     private RenderDistanceLimit() {
     }
 
     public static int max() {
+        if (ANDROID) {
+            // Vanilla's own rule, restated: 32 on a 64-bit JVM with a heap of
+            // a gigabyte or more, 16 otherwise. apply() leaves the game's
+            // slider alone here, so this is the same answer it already has.
+            return Runtime.getRuntime().maxMemory() >= 1000000000L
+                    && System.getProperty("os.arch", "").contains("64") ? 32 : 16;
+        }
         return VulkanConfig.isExtremeRenderDistance() ? EXTREME : NORMAL;
     }
 
@@ -57,7 +72,9 @@ public final class RenderDistanceLimit {
      */
     public static void apply() {
         int max = max();
-        GameSettings.Options.RENDER_DISTANCE.setValueMax(max);
+        if (!ANDROID) {
+            GameSettings.Options.RENDER_DISTANCE.setValueMax(max);
+        }
         Minecraft mc = Minecraft.getMinecraft();
         if (mc == null || mc.gameSettings == null) {
             return;

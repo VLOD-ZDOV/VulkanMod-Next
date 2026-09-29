@@ -162,8 +162,9 @@ final class VulkanOptions {
                                 }),
                         new VActionOption("Potato",
                                 "For a machine this game is too heavy for. Everything Performance "
-                                        + "gives up, plus smooth lighting, clouds and eight chunks "
-                                        + "of view — and a sixty frame ceiling with vsync on. "
+                                        + "gives up, plus block textures — every face drawn in one "
+                                        + "flat colour — and eight chunks of view, and a sixty "
+                                        + "frame ceiling with vsync on. "
                                         + "Mipmaps stay on, and deliberately: turning them off is "
                                         + "the obvious-looking way to make textures cheap and it "
                                         + "does the reverse, sending distant blocks to read the "
@@ -292,7 +293,7 @@ final class VulkanOptions {
                         new VSwitchOption("Frame Time Graph",
                                 "Draw a frame-time graph in the bottom-left corner: one bar per "
                                         + "frame over the last couple of seconds, with the best and "
-                                        + "worst single frame and the 1%% low — the frame time that "
+                                        + "worst single frame and the 1% low — the frame time that "
                                         + "only one frame in a hundred exceeds. The framerate the "
                                         + "game already shows is frames divided by seconds, and it "
                                         + "cannot tell a steady 120 from a 240 that stalls every "
@@ -784,6 +785,37 @@ final class VulkanOptions {
                                         VulkanConfig.setCompactVertices(value);
                                     }
                                 }),
+                        // The settings file, the log line that switched it on
+                        // for existing installs and the changelog all send
+                        // people to this row; until it existed there was no
+                        // way to reach the setting from the game.
+                        new VSwitchOption("Group Quad Facings",
+                                "Sort each chunk's faces by which way they point, so the ones "
+                                        + "a camera cannot possibly see are never read. Standing "
+                                        + "above a floor you cannot see its underside, and the "
+                                        + "card knows that too — but it only finds out after "
+                                        + "reading every one of those vertices, and reading "
+                                        + "vertices is what this renderer's terrain pass is "
+                                        + "limited by. Measured at render distance 32: 36% of the "
+                                        + "reading stops happening, and the frame rate rises "
+                                        + "eleven to thirteen per cent up to 1440p and five at "
+                                        + "4K, where the frame is spending its time on pixels "
+                                        + "instead. On by default; turn it off if a face ever "
+                                        + "goes missing where the camera crosses a floor, a "
+                                        + "ceiling or a wall.",
+                                Cost.of(Level.NONE, Level.SAVES_MEDIUM, Level.NONE),
+                                "Applies after the game restarts.",
+                                new VSwitchOption.Access() {
+                                    @Override
+                                    public boolean get() {
+                                        return VulkanConfig.isGroupFacings();
+                                    }
+
+                                    @Override
+                                    public void set(boolean value) {
+                                        VulkanConfig.setGroupFacings(value);
+                                    }
+                                }),
                         new VSwitchOption("Short Layer Filter List",
                                 "Give the step that picks which chunks contribute to a render "
                                         + "layer only the sections that hold blocks. It runs four "
@@ -798,11 +830,13 @@ final class VulkanOptions {
                                         + "at all, and saying so is the point: once the entity "
                                         + "passes were shortened the frame stopped waiting on this "
                                         + "thread, so the work removed here is real and hides in "
-                                        + "time that was already spare. Worth turning on if your "
+                                        + "time that was already spare. Worth having if your "
                                         + "frames are held back by the processor rather than the "
-                                        + "graphics card. Off by default because what it could get "
-                                        + "wrong is a chunk that stops being drawn, and that looks "
-                                        + "exactly like terrain that has not finished building.",
+                                        + "graphics card. On by default now that the list has been "
+                                        + "checked against the full scan over 16 500 layer passes "
+                                        + "with nothing missing. Turn it off if a chunk ever stops "
+                                        + "being drawn, which looks exactly like terrain that has "
+                                        + "not finished building.",
                                 Cost.of(Level.NONE, Level.NONE, Level.NONE),
                                 "Needs Own Visibility Search on; the game's own search keeps no "
                                         + "index of where a section sits.",
@@ -1806,7 +1840,7 @@ final class VulkanOptions {
                                         + "than about the surface, which is what a depth buffer "
                                         + "answers — and the depth buffer is already here, so this "
                                         + "costs no geometry and no second pass over the world. "
-                                        + "Eight neighbours are asked whether they stand in front "
+                                        + "Sixteen neighbours are asked whether they stand in front "
                                         + "of the surface, at half resolution and blurred, because "
                                         + "the answer is about corners and crevices rather than "
                                         + "about texels. This is not the only occlusion in the "
@@ -2786,8 +2820,10 @@ final class VulkanOptions {
                 new VOptionBlock("Ray Tracing",
                         new VSwitchOption("Terrain Acceleration Structures",
                                 "Build the structures a traced ray needs over the terrain this mod "
-                                        + "draws. Nothing uses them yet, and the world looks "
-                                        + "exactly the same with this on. What it produces is a "
+                                        + "draws. On their own they change nothing on screen, "
+                                        + "but the sun's shadow, traced light shadows, traced "
+                                        + "block light and the light through a canopy need them "
+                                        + "and do nothing without them. They also produce a "
                                         + "measurement: the obstacle to ray tracing in this game "
                                         + "has always been that the structure has to be rebuilt "
                                         + "whenever a chunk is, and rebuilding chunks is already "
