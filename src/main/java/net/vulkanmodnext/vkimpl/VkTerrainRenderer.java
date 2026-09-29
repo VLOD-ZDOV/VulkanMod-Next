@@ -3132,6 +3132,13 @@ final class VkTerrainRenderer {
      * once if it is ever untrue.
      */
     private boolean frameSignalled;
+
+    /**
+     * OpenGL has signalled the opaque semaphore and no Vulkan submission has
+     * waited on it yet. Kept across a resize on purpose: the semaphore is, and
+     * so is the signal it carries. See the wait in {@link #submitFrame}.
+     */
+    private boolean glSignalPending;
     private boolean pairingWarned;
 
     private void submitFrame() {
@@ -3169,7 +3176,18 @@ final class VkTerrainRenderer {
                 // what to wait for, see setFenceValue.
                 signalFenceValue++;
             }
-            if (!firstFrame && SHARED_SEMAPHORES) {
+            // Waited on exactly when OpenGL has signalled and nothing has
+            // consumed it yet — not "on every frame but the first". The two
+            // came apart on a resize: the targets are rebuilt, firstFrame is
+            // set again, but the semaphore is not rebuilt and still carries the
+            // last composite's signal. The next submit skipped the wait, the
+            // next composite signalled a binary semaphore that was already
+            // signalled, and from then on every wait consumed the frame before
+            // it — Vulkan's writes no longer ordered after OpenGL's reads, for
+            // the rest of the session. The same flag keeps a depth-sharing drop
+            // that never handed back from leaving the next submit waiting on a
+            // signal that will never come.
+            if (glSignalPending && SHARED_SEMAPHORES) {
                 // The depth clear runs at the early fragment tests, ahead of
                 // colour output: a wait at colour output alone would let it
                 // land while OpenGL is still reading the last frame's depth.
@@ -3181,6 +3199,9 @@ final class VkTerrainRenderer {
             firstFrame = false;
             firstFrameStage("submitting the opaque frame");
             check(vkQueueSubmit(ctx.getGraphicsQueue(), submit, fence), "vkQueueSubmit(terrain)");
+            if (SHARED_SEMAPHORES) {
+                glSignalPending = false;
+            }
             if (!SHARED_SEMAPHORES) {
                 // Nothing will tell OpenGL when these images are finished, so
                 // finishing them here is the only ordering left.
@@ -3846,6 +3867,7 @@ final class VkTerrainRenderer {
             waitFenceValue++;
             setFenceValue(glSignalSemaphore, waitFenceValue);
             EXTSemaphore.glSignalSemaphoreEXT(glSignalSemaphore, noBuffers, textures, layouts);
+            glSignalPending = true;
             GL11C.glFlush();
         }
     }
@@ -4491,6 +4513,7 @@ final class VkTerrainRenderer {
                 waitFenceValue++;
                 setFenceValue(glSignalSemaphore, waitFenceValue);
                 EXTSemaphore.glSignalSemaphoreEXT(glSignalSemaphore, noBuffers, textures, layouts);
+                glSignalPending = true;
                 GL11C.glFlush();
             } else {
                 // The next Vulkan frame writes these images with nothing told
