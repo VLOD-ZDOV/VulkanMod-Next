@@ -31,6 +31,9 @@ public final class CpuSavings {
     /** Visible-list entries the game's block-entity pass walked. */
     private static long blockEntityWalked;
 
+    /** Off-screen sections queued for a build by the preload sweep. */
+    private static long preloaded;
+
     /** Visible-list entries the Vulkan terrain draw walked, all layers together. */
     private static long layerWalked;
 
@@ -61,6 +64,10 @@ public final class CpuSavings {
         blockEntityWalked += entries;
     }
 
+    public static void countPreloaded() {
+        preloaded++;
+    }
+
     public static void countFrustumTest(boolean answered) {
         frustumTests++;
         if (answered) {
@@ -77,7 +84,8 @@ public final class CpuSavings {
         return "cpu savings: frustum tests " + frustumTests + " (" + frustumAnswered
                 + " by the far corner), chunks built on the render thread " + syncBuilds
                 + " (" + syncBuildNanos / 1000000L + " ms), terrain layer walk " + layerWalked
-                + " entries, block-entity walk " + blockEntityWalked + " entries; "
+                + " entries, block-entity walk " + blockEntityWalked + " entries, off-screen "
+                + "sections preloaded " + preloaded + "; "
                 + ShortSections.stats();
     }
 }
