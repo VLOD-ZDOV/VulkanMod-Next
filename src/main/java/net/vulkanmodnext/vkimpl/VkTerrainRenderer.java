@@ -10058,7 +10058,13 @@ final class VkTerrainRenderer {
         // incomplete for the colour draw buffer it no longer has, and the
         // refusal would be blamed on the depth image.
         GL20C.glDrawBuffers(GL11C.GL_NONE);
-        GL11C.glReadBuffer(GL11C.GL_NONE);
+        // No glReadBuffer here, and its absence is the point. Only the DRAW
+        // binding is this framebuffer; glReadBuffer acts on whatever is bound
+        // for READING, which at this moment is the game's own frame. Setting
+        // it to none there made every later copy out of the game's frame fail
+        // — the same mistake that once blackened the world on AMD, back again
+        // for one line. Draw completeness does not look at the read buffer, so
+        // the line bought nothing.
         int depthStatus = GL30C.glCheckFramebufferStatus(GL30C.GL_DRAW_FRAMEBUFFER);
         GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, prevDraw);
         GL30C.glDeleteFramebuffers(fbo);
