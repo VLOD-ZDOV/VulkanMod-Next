@@ -5,7 +5,7 @@
 ### 1.16.5 port
 
 The 1.16.5 build catches up: from 43 of the 1.12.2 build's 106 settings doing
-something to 69. Every one marked working was turned to both ends in the same
+something to 72. Every one marked working was turned to both ends in the same
 flight and the two frames compared; the ones that could not be shown that way
 are still marked "not yet ported" in the menu.
 
@@ -21,13 +21,14 @@ are still marked "not yet ported" in the menu.
   drawn through Vulkan.** The animation frames never reached the renderer's copy
   of the block atlas.
 - **Added:** dynamic lights (held and dropped light sources, burning mobs),
-  fog switch and fog distance, time and weather control, round sun, sun size,
+  fog switch and fog distance, time and weather control, round sun and moon with
+  size and warmth,
   cloud tint, frame graph, diagnostics file, render distance up to 128, chunk
   build threads, animated textures switch, vanilla buffer drop, and handing
   water and glass back to the game.
 - **Ported but not yet shown working, so still greyed in the menu:** zoom,
   background frame cap, entity and block entity distance, explosion particle
-  budget, update check, near plane, moon size and roundness, sun warmth.
+  budget, update check, near plane.
 - Ray tracing and the settings built on it are labelled as impossible on this
   version rather than "not yet": the game's own Vulkan bindings predate it.
 
