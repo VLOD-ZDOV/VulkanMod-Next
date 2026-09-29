@@ -17,6 +17,8 @@
     "MaterialTagMixin",
     "SceneEffectsMixin",
     "SkySunMixin",
+    "EntityLightMixin",
+    "ParticleLightMixin",
     "StartupMixin",
     "TerrainDrawMixin",
     "WorldRendererAccess",
