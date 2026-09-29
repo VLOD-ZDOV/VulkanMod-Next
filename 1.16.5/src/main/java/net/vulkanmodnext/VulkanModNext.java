@@ -46,5 +46,13 @@ public class VulkanModNext {
                 new net.vulkanmodnext.client.ClientTicks());
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(
                 new net.vulkanmodnext.client.FogDistance());
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(
+                new net.vulkanmodnext.client.Zoom.Handler());
+        // Key bindings are handed over during client setup, on the mod's own
+        // bus: that is where Forge expects them, and the constructor runs on
+        // the loading threads, where adding to the game's key list races it.
+        net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext.get().getModEventBus()
+                .addListener((net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent event) ->
+                        net.vulkanmodnext.client.Zoom.register());
     }
 }
