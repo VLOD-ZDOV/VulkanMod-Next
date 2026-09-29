@@ -6,6 +6,7 @@
   "plugin": "net.vulkanmodnext.EarlySetup",
   "minVersion": "0.8",
   "client": [
+    "AtlasAnimationMixin",
     "BackgroundThrottleMixin",
     "BufferBuilderAccess",
     "ChunkBufferLayerMixin",
@@ -20,6 +21,7 @@
     "SkySunMixin",
     "EntityLightMixin",
     "ParticleLightMixin",
+    "SpriteUploadMixin",
     "StartupMixin",
     "TerrainDrawMixin",
     "WorldRendererAccess",

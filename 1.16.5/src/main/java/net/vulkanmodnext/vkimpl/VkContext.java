@@ -915,6 +915,15 @@ public final class VkContext {
                 && terrainRenderer.drawsTranslucent();
     }
 
+    /** Animation frames for the copy of the block atlas; see AtlasAnimations. */
+    public synchronized void updateAtlasRegions(int[] header, int headerCount,
+                                                int[] pixels, int pixelCount) {
+        if (!initialized || terrainRenderer == null) {
+            return;
+        }
+        terrainRenderer.updateAtlasRegions(header, headerCount, pixels, pixelCount);
+    }
+
     public synchronized void setMaterialSprites(int[] materials, float[] rects, int count) {
         if (!initialized) {
             return;
