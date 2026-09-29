@@ -429,6 +429,8 @@ public final class Diagnostics {
         }
         out.println("  " + MaterialRuns.stats());
         out.println("  " + DynamicLights.stats());
+        out.println("  " + ParticleHooks.stats());
+        out.println("  " + WeatherHooks.stats());
         out.println("  " + BlockLightSources.stats());
         out.println("  " + FrameGraph.stats());
         // What this run was actually configured as. Without it a number has to

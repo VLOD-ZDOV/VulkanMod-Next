@@ -149,18 +149,55 @@ public final class TerrainFrame {
         announceOnce(layer, count, empty, unmirrored, viewX, viewY, viewZ);
 
         int ordinal = ordinalOf(layer);
-        if (!VulkanConfig.isTerrainEnabled() || count == 0 || ordinal < 0) {
+        boolean translucent = ordinal == 3;
+        // An empty translucent layer is not the end of it: particles and rain
+        // are drawn in that same pass, and a frame with no water in view still
+        // has to run it for them. Standing in a desert and breaking a block
+        // put the particles nowhere at all on 1.12.2 until it did.
+        if (!VulkanConfig.isTerrainEnabled() || ordinal < 0 || (count == 0 && !translucent)) {
             return false;
         }
         if (!handOverTextures(context)) {
             return false;
         }
-
-        handOverFrameState(context, matrices, viewX, viewY, viewZ);
-        boolean drawn = context.renderTerrainLayer(ordinal, slots, count, mvp,
-                viewX, viewY, viewZ,
-                Minecraft.getInstance().getWindow().getWidth(),
-                Minecraft.getInstance().getWindow().getHeight());
+        if (ordinal == 0) {
+            // Before the frame opens: a sheet that has to be copied waits for
+            // the device, and nothing of this frame is queued yet.
+            Sprites.syncSheets(context);
+        }
+        int particles = 0;
+        boolean drawn = false;
+        try {
+            if (translucent) {
+                // Built now, before the pass is recorded, because the game's
+                // own particles and weather come after it on this version; see
+                // Sprites. Particles first, weather second: the game's order.
+                particles = ParticleHooks.capture(context, matrices, frameProjection,
+                        viewX, viewY, viewZ);
+                int weather = WeatherHooks.capture(context, renderer, layer, matrices,
+                        viewX, viewY, viewZ);
+                if (count == 0 && particles + weather == 0) {
+                    return false;
+                }
+            }
+            handOverFrameState(context, matrices, viewX, viewY, viewZ);
+            drawn = context.renderTerrainLayer(ordinal, slots, count, mvp,
+                    viewX, viewY, viewZ,
+                    Minecraft.getInstance().getWindow().getWidth(),
+                    Minecraft.getInstance().getWindow().getHeight());
+        } finally {
+            if (translucent) {
+                // Whatever was parked went with the pass. If there was no
+                // pass, the game has to draw all of it at its own moment.
+                ParticleHooks.settle(drawn, particles);
+                WeatherHooks.settle(drawn);
+            }
+        }
+        if (count == 0) {
+            // Only the sprites were ours. The layer itself is empty, or holds
+            // chunks not mirrored yet, and the game draws whatever it has.
+            return false;
+        }
         taken[ordinal] += drawn ? 1 : 0;
         refused[ordinal] += drawn ? 0 : 1;
         if (!drawn && droppingVanillaBuffers) {
@@ -308,6 +345,11 @@ public final class TerrainFrame {
         }
         if (atlas != sentAtlas) {
             context.updateAtlas(atlas);
+            // A new atlas makes the renderer drop every sprite sheet with it.
+            // Until the first layer of a frame copies them back, a particle
+            // batch would be parked against a slot with no image and skipped
+            // by the pass — taken from the game and drawn by nobody.
+            Sprites.forgetSheets();
             // After the atlas, and every time it is sent: stitching decides
             // afresh where each sprite lands, and the rectangles are what the
             // translucent layer's material is read from. See MaterialSprites.
@@ -370,6 +412,8 @@ public final class TerrainFrame {
     public static void beginFrame(Matrix4f projection) {
         frameProjection = projection;
         frames++;
+        ParticleHooks.beginFrame();
+        WeatherHooks.beginFrame();
         updateVanillaBufferDrop();
     }
 
