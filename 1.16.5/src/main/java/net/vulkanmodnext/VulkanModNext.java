@@ -26,6 +26,12 @@ public class VulkanModNext {
     public VulkanModNext() {
         LOGGER.info("VulkanMod 1.16.5 loaded.");
         net.vulkanmodnext.client.VulkanConfig.load(FMLPaths.CONFIGDIR.get().toFile());
+        // Straight after the settings and before anything else logs: what the
+        // diagnostics file is most often wanted for is a start that went wrong,
+        // and those lines are all said before the first frame opens the file.
+        net.vulkanmodnext.client.Diagnostics.startCapture();
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(
+                new net.vulkanmodnext.client.Diagnostics.Handler());
         // On its own daemon thread and straight after the settings, so the
         // answer is waiting by the time the player is in a world rather than
         // being fetched while they play. The notice only speaks once it has one.
