@@ -915,6 +915,36 @@ public final class VkContext {
                 && terrainRenderer.drawsTranslucent();
     }
 
+    /**
+     * Whether particles and weather can go through Vulkan: the translucent
+     * pass, and the sprite pipeline inside it. See client/Sprites.
+     */
+    public synchronized boolean drawsSprites() {
+        return initialized && interopCapable && terrainRenderer != null
+                && terrainRenderer.drawsSprites();
+    }
+
+    /** One of the game's sprite sheets, by slot; a no-op when already held. */
+    public synchronized void updateSpriteTexture(int slot, int glTextureId) {
+        if (!initialized || !interopCapable) {
+            return;
+        }
+        terrainRenderer().updateSpriteTexture(slot, glTextureId);
+    }
+
+    /**
+     * Parks one batch of camera-facing quads for this frame's translucent pass.
+     *
+     * @return false when the batch was not taken and the caller must draw it
+     */
+    public synchronized boolean submitSprites(ByteBuffer vertices, int vertexCount,
+                                              int spriteSlot, float alphaCutoff) {
+        if (!initialized || !interopCapable || terrainRenderer == null) {
+            return false;
+        }
+        return terrainRenderer.submitSprites(vertices, vertexCount, spriteSlot, alphaCutoff);
+    }
+
     /** Animation frames for the copy of the block atlas; see AtlasAnimations. */
     public synchronized void updateAtlasRegions(int[] header, int headerCount,
                                                 int[] pixels, int pixelCount) {
