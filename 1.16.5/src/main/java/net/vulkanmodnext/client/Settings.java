@@ -126,7 +126,7 @@ public final class Settings {
                 "The sun itself sliding along the ripples, and the moon doing the same at ");
         add("cloudShadows", Category.GENERAL, false, 0, 100, 0, true,
                 "How dark a shadow the clouds overhead cast on the world. Read from the very sheet the game draws its clouds from, at the height the world reports and with the drift the game itself counts - so the dark patch lands under the cloud that cast it rather than beside it. Needs the clouds turned on and the sun above the horizon; fades out near the horizon, where the journey up to the cloud layer is long enough that the shadow lands nowhere near what is overhead.");
-        add("cloudTint", Category.GENERAL, false, 0, 100, 0, false,
+        add("cloudTint", Category.GENERAL, false, 0, 100, 0, true,
                 "How much of the sky's own colour the clouds take. Vanilla clouds are white at ");
         add("colourVision", Category.GENERAL, false, 0, 3, 0, true,
                 "Move the colours one kind of eye cannot separate into the channels it still can. ");
@@ -138,21 +138,21 @@ public final class Settings {
                 "How far dynamic light goes towards caring which way a surface is turned, in ");
         add("dynamicLightDistance", Category.GENERAL, false, 1, 200, 160, false,
                 "How far away a light source may be and still be drawn, in blocks. This is not how ");
-        add("dynamicLights", Category.GENERAL, true, 0, 1, 0, false,
+        add("dynamicLights", Category.GENERAL, true, 0, 1, 0, true,
                 "Let a carried torch, a dropped glowing block or a burning creature light the ");
         add("exposure", Category.GENERAL, false, 0, 100, 50, true,
                 "How much light is let in before the film curve closes the range back down. The middle is no change. Only means anything with the frame above turned on.");
-        add("extremeRenderDistance", Category.GENERAL, true, 0, 1, 0, false,
+        add("extremeRenderDistance", Category.GENERAL, true, 0, 1, 0, true,
                 "Let the render-distance slider go past 64, up to 128. The game builds a render ");
-        add("fog", Category.GENERAL, true, 0, 1, 1, false,
+        add("fog", Category.GENERAL, true, 0, 1, 1, true,
                 "Fade Vulkan terrain into the distance the way the rest of the scene already does. ");
-        add("fogDistance", Category.GENERAL, false, 1, 400, 100, false,
+        add("fogDistance", Category.GENERAL, false, 1, 400, 100, true,
                 "How far the game's own distance fog reaches, as a percentage of what the game ");
         add("foliageSway", Category.GENERAL, false, 0, 100, 0, true,
                 "How far the top of a plant leans in the wind, in percent. 0 is off. Grass, ");
-        add("frameGraph", Category.GENERAL, true, 0, 1, 0, false,
+        add("frameGraph", Category.GENERAL, true, 0, 1, 0, true,
                 "Show a frame-time graph in the bottom-left corner, with the worst and best frame ");
-        add("frameGraphIntervalMs", Category.GENERAL, false, 100, 5000, 1000, false,
+        add("frameGraphIntervalMs", Category.GENERAL, false, 100, 5000, 1000, true,
                 "How often the frame graph recomputes the numbers above it, in milliseconds. The ");
         add("godRays", Category.GENERAL, false, 0, 100, 0, true,
                 "How bright the shafts of light from the sun may be. Gathered from the finished picture: the walk from a pixel towards the sun adds up what the sky shows through, so anything standing in the way leaves a dark lane and a gap in a canopy leaves a bright one. No geometry and no rays are involved, so it cannot break another mod - and whatever a mod drew is in the picture and casts its own shafts for free. Needs the sun above the horizon and roughly in front of you; fades out rather than switching off as it leaves the screen.");
@@ -164,9 +164,9 @@ public final class Settings {
                 "The drop below the camera, in blocks, over which height fog reaches nearly all ");
         add("iceShine", Category.GENERAL, false, 0, 100, 0, true,
                 "How much of the sky ice gathers on its surface. The game draws ice as a flat ");
-        add("leafGlow", Category.GENERAL, false, 0, 100, 0, false,
+        add("leafGlow", Category.GENERAL, false, 0, 100, 0, true,
                 "How brightly a leaf lets the sun through from behind it. The game shades a leaf ");
-        add("leafShadows", Category.GENERAL, false, 0, 100, 0, false,
+        add("leafShadows", Category.GENERAL, false, 0, 100, 0, true,
                 "How much light gets through leaves and plants in a traced shadow. A ray cannot ");
         add("lightSoftness", Category.GENERAL, false, 0, 100, 30, true,
                 "How soft the edge of a shadow cast by a torch or a fire is. Separate from the ");
@@ -180,7 +180,7 @@ public final class Settings {
                 "How much of the chunk grid Offscreen Chunk Preload looks through each frame ");
         add("roundMoon", Category.GENERAL, true, 0, 1, 0, false,
                 "Draw the moon as a round disc with a soft glow. The game does not draw a moon so ");
-        add("roundSun", Category.GENERAL, true, 0, 1, 0, false,
+        add("roundSun", Category.GENERAL, true, 0, 1, 0, true,
                 "Draw the sun as a round, warm disc instead of vanilla's square. The picture is ");
         add("sceneGamma", Category.GENERAL, false, 0, 100, 50, true,
                 "How the finished frame is bent before it reaches the screen. Fifty is the frame ");
@@ -200,7 +200,7 @@ public final class Settings {
                 "How much the fog warms towards the sun and cools away from it. The game fogs ");
         add("sunShadows", Category.GENERAL, false, 0, 100, 0, true,
                 "How dark the sun's shadow is, traced against the terrain. Needs Terrain ");
-        add("sunSize", Category.GENERAL, false, 0, 100, 50, false,
+        add("sunSize", Category.GENERAL, false, 0, 100, 50, true,
                 "How large the disc is drawn. The quad the game gives the sun cannot be resized ");
         add("sunWarmth", Category.GENERAL, false, 0, 100, 60, false,
                 "How far towards orange the rim of the sun goes. 0 leaves it white. The centre ");
@@ -208,9 +208,9 @@ public final class Settings {
                 "How much of what a pixel looked like last frame it keeps. A traced shadow is ");
         add("terrainEnabled", Category.GENERAL, true, 0, 1, 0, true,
                 "Render supported terrain layers through Vulkan. Disabling immediately returns terrain to vanilla OpenGL.");
-        add("timeControl", Category.GENERAL, false, 0, 2, 0, false,
+        add("timeControl", Category.GENERAL, false, 0, 2, 0, true,
                 "Whether the time of day you see is the world's own, held where it was, or set ");
-        add("timeOfDay", Category.GENERAL, false, 0, 23, 12, false,
+        add("timeOfDay", Category.GENERAL, false, 0, 23, 12, true,
                 "Which hour to show when the control above is set to Fixed. The day is kept, so ");
         add("tracedBlockLight", Category.GENERAL, false, 0, 100, 0, false,
                 "How much of the game's own block light to replace with light traced from the ");
@@ -218,23 +218,23 @@ public final class Settings {
                 "How many moving lights a surface may ask whether something is in the way. A ");
         add("updateCheck", Category.GENERAL, true, 0, 1, 1, false,
                 "Ask once when the game starts whether a newer build of this mod exists, and say so at the top of this screen. Both the page it is published on and the repository it is built from are asked, because a build can be on one and not yet on the other, and the button then leads to whichever of them actually has it. Two GET requests with no query, no body and no identifier: the only thing said about you is a user agent naming this mod and its version, which one of the two services refuses a request without. Nothing about the machine, the player, the world or the other mods is collected or sent. Off means the requests are never made.");
-        add("waterCaustics", Category.GENERAL, false, 0, 100, 0, false,
+        add("waterCaustics", Category.GENERAL, false, 0, 100, 0, true,
                 "How much light gathers into moving bands on the bed of shallow water. Real ");
-        add("waterReflection", Category.GENERAL, false, 0, 100, 0, false,
+        add("waterReflection", Category.GENERAL, false, 0, 100, 0, true,
                 "How much of a water surface turns into a reflection of the sky as you look ");
         add("waterRefraction", Category.GENERAL, false, 0, 100, 0, true,
                 "How much the surface of water bends what is seen through it. Reflection and ");
-        add("waterWaves", Category.GENERAL, false, 0, 100, 0, false,
+        add("waterWaves", Category.GENERAL, false, 0, 100, 0, true,
                 "How much a moving wave pattern tilts the water surface, in percent. 0 is off. ");
-        add("weatherControl", Category.GENERAL, false, 0, 3, 0, false,
+        add("weatherControl", Category.GENERAL, false, 0, 3, 0, true,
                 "Whether the weather you see is the world's own or one you pick. Local to this ");
-        add("wetSurfaces", Category.GENERAL, false, 0, 100, 0, false,
+        add("wetSurfaces", Category.GENERAL, false, 0, 100, 0, true,
                 "How much rain makes upward-facing surfaces gather the sky. Only faces pointing ");
         add("zoom", Category.GENERAL, true, 0, 1, 1, false,
                 "Hold-to-zoom on the key bound in Controls.");
         add("zoomFactor", Category.GENERAL, false, 2, 10, 4, false,
                 "How far the zoom key narrows the field of view. 4 means a quarter of it.");
-        add("animatedTextures", Category.OPTIMIZATION, true, 0, 1, 1, false,
+        add("animatedTextures", Category.OPTIMIZATION, true, 0, 1, 1, true,
                 "Update animated block textures. Off skips the per-tick frame uploads for every animated sprite.");
         add("backgroundFpsLimit", Category.OPTIMIZATION, false, 0, 60, 10, false,
                 "Framerate cap while the game window is not active. 0 disables the cap.");
@@ -242,11 +242,11 @@ public final class Settings {
                 "Queue a chunk that changed close to you for a builder thread instead of ");
         add("cacheBlockEntityModels", Category.OPTIMIZATION, true, 0, 1, 1, false,
                 "Record the primed TNT cube once and replay it, instead of looking the model up ");
-        add("chunkBuildThreads", Category.OPTIMIZATION, false, 0, 64, 0, false,
+        add("chunkBuildThreads", Category.OPTIMIZATION, false, 0, 64, 0, true,
                 "How many threads build chunk geometry. 0 keeps vanilla's count, which it derives from ");
         add("chunkPreload", Category.OPTIMIZATION, true, 0, 1, 0, false,
                 "Let chunks outside the view be rebuilt. Vanilla only ever schedules chunks that are ");
-        add("dropVanillaBuffers", Category.OPTIMIZATION, true, 0, 1, 1, false,
+        add("dropVanillaBuffers", Category.OPTIMIZATION, true, 0, 1, 1, true,
                 "Stop filling the game's own chunk buffers once Vulkan has the geometry. The world ");
         add("entityDistance", Category.OPTIMIZATION, false, 0, 256, 0, false,
                 "Stop drawing entities past this many blocks. 0 keeps vanilla's per-entity limit.");
@@ -258,7 +258,7 @@ public final class Settings {
                 "Hand the last loop of the terrain setup only the chunks it can act on. That loop ");
         add("groupQuadFacings", Category.OPTIMIZATION, true, 0, 1, 1, true,
                 "Sort each chunk's faces by which way they point, so the ones a camera cannot ");
-        add("materialTags", Category.OPTIMIZATION, true, 0, 1, 0, false,
+        add("materialTags", Category.OPTIMIZATION, true, 0, 1, 0, true,
                 "Record what each stretch of a chunk's geometry is made of while the chunk is ");
         add("nearPlaneHundredths", Category.OPTIMIZATION, false, 0, 50, 10, false,
                 "Near clipping plane in hundredths of a block. 0 keeps vanilla's 0.05, which at long ");
@@ -276,7 +276,7 @@ public final class Settings {
                 "Reuse the seed of the chunk visibility search while the camera stays in the same ");
         add("vulkanParticles", Category.OPTIMIZATION, true, 0, 1, 1, false,
                 "Draw particles with Vulkan. The game still decides where every particle is and ");
-        add("vulkanTranslucent", Category.OPTIMIZATION, true, 0, 1, 1, false,
+        add("vulkanTranslucent", Category.OPTIMIZATION, true, 0, 1, 1, true,
                 "Draw water and glass in Vulkan rather than leaving them on the OpenGL path. Not ");
         add("vulkanWeather", Category.OPTIMIZATION, true, 0, 1, 1, false,
                 "The same for rain and snow. A separate switch from the one above so that either ");
@@ -294,7 +294,7 @@ public final class Settings {
                 "Read what the game draws for every creature, and draw none of it. The first step ");
         add("flatBlockColours", Category.ADVANCED, true, 0, 1, 0, true,
                 "Draw every block face in one flat colour by reading the smallest level of the ");
-        add("frameGraphCorner", Category.ADVANCED, false, 0, 3, 0, false,
+        add("frameGraphCorner", Category.ADVANCED, false, 0, 3, 0, true,
                 "Which corner the frame time graph sits in. The default is the bottom left, ");
         add("framesInFlight", Category.ADVANCED, false, 1, 3, 2, true,
                 "How many terrain frames the CPU may run ahead of the GPU. Higher smooths out stalls ");
@@ -320,9 +320,9 @@ public final class Settings {
                 "Draw the ambient occlusion on its own, as flat grey, instead of applying it to ");
         add("showReflections", Category.ADVANCED, true, 0, 1, 0, true,
                 "Paint the water with what the reflected ray found and nothing else: no fresnel ");
-        add("ultraLog", Category.ADVANCED, true, 0, 1, 0, false,
+        add("ultraLog", Category.ADVANCED, true, 0, 1, 0, true,
                 "Write a detailed diagnostics report to logs/vulkanmodnext-diagnostics.log.");
-        add("ultraLogSeconds", Category.ADVANCED, false, 1, 120, 10, false,
+        add("ultraLogSeconds", Category.ADVANCED, false, 1, 120, 10, true,
                 "Seconds between diagnostics snapshots.");
         add("vulkanDevice", Category.ADVANCED, false, -1, 7, -1, true,
                 "Which GPU Vulkan renders on, by the number the log gives it. -1 chooses ");
