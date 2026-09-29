@@ -29,7 +29,8 @@
     "WorldTimeDisplayMixin",
     "EntityRenderDistanceMixin",
     "TileEntityRenderDistanceMixin",
-    "ExplosionParticleMixin"
+    "ExplosionParticleMixin",
+    "NearPlaneMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }
