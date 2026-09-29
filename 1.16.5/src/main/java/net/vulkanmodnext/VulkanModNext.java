@@ -44,5 +44,7 @@ public class VulkanModNext {
         LOGGER.info("Vulkan bindings: {}", VulkanProbe.describe());
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(
                 new net.vulkanmodnext.client.ClientTicks());
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(
+                new net.vulkanmodnext.client.FogDistance());
     }
 }
