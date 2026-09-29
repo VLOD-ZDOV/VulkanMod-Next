@@ -206,7 +206,7 @@ public final class Settings {
                 "How far towards orange the rim of the sun goes. 0 leaves it white. The centre ");
         add("temporalAccumulation", Category.GENERAL, false, 0, 100, 60, false,
                 "How much of what a pixel looked like last frame it keeps. A traced shadow is ");
-        add("terrainEnabled", Category.GENERAL, true, 0, 1, 0, true,
+        add("terrainEnabled", Category.GENERAL, true, 0, 1, 1, true,
                 "Render supported terrain layers through Vulkan. Disabling immediately returns terrain to vanilla OpenGL.");
         add("timeControl", Category.GENERAL, false, 0, 2, 0, true,
                 "Whether the time of day you see is the world's own, held where it was, or set ");
