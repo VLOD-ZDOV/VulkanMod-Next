@@ -2742,10 +2742,20 @@ final class VkTerrainRenderer {
             fence = fences[slot];
             long t0 = System.nanoTime();
             check(vkWaitForFences(device(), fence, true, 1_000_000_000L), "vkWaitForFences");
+            // The translucent pass of that same earlier frame as well. It is a
+            // separate submission, made later in the frame than the opaque one,
+            // so the opaque fence says nothing about it — and everything below
+            // frees retired geometry and rewrites this slot's uniforms, both of
+            // which that pass reads. Without this wait a late translucent pass
+            // read freed memory: the same shape as the MMU faults this renderer
+            // has already had twice.
+            check(vkWaitForFences(device(), translucentFences[slot], true, 1_000_000_000L),
+                    "vkWaitForFences(translucent, frame start)");
             fenceWaitNanos += System.nanoTime() - t0;
             vkResetFences(device(), fence);
             readGpuTimestamps(stack, slot);
-            // This slot's fence covers frame N-2; everything up to it is done
+            // Both of this slot's fences cover frame N-2 now; everything up to
+            // it is done
             mirror.setFrameStamp(frameCounter);
             mirror.flushRetired(frameCounter - framesInFlight);
             ensureQuadIndexCapacity(mirror.maxEntrySize() / VertexLayout.stride() / 4);
@@ -3974,7 +3984,9 @@ final class VkTerrainRenderer {
                 return false;
             }
             translucentWaitNanos += waitNanos;
-            check(vkResetFences(device(), translucentFences[slot]), "vkResetFences(translucent)");
+            // Not reset here: see the submit below. The start of every frame
+            // now waits on this fence too, so it must never be left unsignalled
+            // by a pass that threw between here and its submission.
 
             // Both the buffer this writes and the index buffer it may resize
             // are read by the commands recorded below, so it goes before the
@@ -4062,6 +4074,12 @@ final class VkTerrainRenderer {
                     .pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT))
                     .pSignalSemaphores(stack.longs(vkTranslucentSignalSemaphore));
             translucentSignalFenceValue++;
+            // Reset immediately before the submission that signals it, with
+            // nothing that can throw in between. beginFrame waits on this fence
+            // as well as the opaque one; a fence reset and then abandoned by an
+            // exception would stall every later frame in this slot for the
+            // whole wait and then hand the terrain back to OpenGL.
+            check(vkResetFences(device(), translucentFences[slot]), "vkResetFences(translucent)");
             check(vkQueueSubmit(ctx.getGraphicsQueue(), submit, translucentFences[slot]),
                     "vkQueueSubmit(translucent)");
         }
