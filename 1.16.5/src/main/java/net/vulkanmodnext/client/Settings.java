@@ -134,7 +134,7 @@ public final class Settings {
                 "How dark a short shadow cast along the ground towards the sun may go. It is worked out from the depth of the picture rather than from geometry, so whatever drew into that depth casts one - a chest, a creature, another mod's machine - and nothing is taken away from any mod to get it. It can only find something that is itself on the screen and within about a block of the surface, which is why it is a contact shadow and not a shadow: it fills the gap where a thing meets the floor, and the sun's own long shadows are the traced ones. Shares the ambient occlusion pass, so it costs a loop rather than a pass, and turn on Occlusion Over Everything for it to see anything but blocks.");
         add("creatureLight", Category.GENERAL, false, 0, 100, 0, true,
                 "How much a creature shades its own faces against the sun, so that a cow in a lit world is lit like the world instead of flat against it. The face is taken from the geometry being drawn rather than from the depth of the picture, so it is exact and has no outline around it. Only the sky half of the game's own lighting is moved, never the block half - a creature in a cave beside a torch is left exactly as the game drew it, whatever this is set to, and that is by construction rather than by tuning. Needs Draw Creatures in Vulkan.");
-        add("directionalLightStrength", Category.GENERAL, false, 0, 100, 50, false,
+        add("directionalLightStrength", Category.GENERAL, false, 0, 100, 50, true,
                 "How far dynamic light goes towards caring which way a surface is turned, in ");
         add("dynamicLightDistance", Category.GENERAL, false, 1, 200, 160, false,
                 "How far away a light source may be and still be drawn, in blocks. This is not how ");
@@ -174,9 +174,9 @@ public final class Settings {
                 "How large the moon is drawn. Same trick as the sun: the quad the game gives it ");
         add("overlayEnabled", Category.GENERAL, true, 0, 1, 0, false,
                 "Show the legacy Vulkan diagnostic overlay.");
-        add("preloadQueue", Category.GENERAL, false, 4, 128, 16, false,
+        add("preloadQueue", Category.GENERAL, false, 4, 128, 16, true,
                 "How many chunks Offscreen Chunk Preload keeps queued for building at once. ");
-        add("preloadScan", Category.GENERAL, false, 512, 32768, 4096, false,
+        add("preloadScan", Category.GENERAL, false, 512, 32768, 4096, true,
                 "How much of the chunk grid Offscreen Chunk Preload looks through each frame ");
         add("roundMoon", Category.GENERAL, true, 0, 1, 0, true,
                 "Draw the moon as a round disc with a soft glow. The game does not draw a moon so ");
@@ -238,13 +238,13 @@ public final class Settings {
                 "Update animated block textures. Off skips the per-tick frame uploads for every animated sprite.");
         add("backgroundFpsLimit", Category.OPTIMIZATION, false, 0, 60, 10, false,
                 "Framerate cap while the game window is not active. 0 disables the cap.");
-        add("buildNearOffThread", Category.OPTIMIZATION, true, 0, 1, 0, false,
+        add("buildNearOffThread", Category.OPTIMIZATION, true, 0, 1, 0, true,
                 "Queue a chunk that changed close to you for a builder thread instead of ");
         add("cacheBlockEntityModels", Category.OPTIMIZATION, true, 0, 1, 1, false,
                 "Record the primed TNT cube once and replay it, instead of looking the model up ");
         add("chunkBuildThreads", Category.OPTIMIZATION, false, 0, 64, 0, true,
                 "How many threads build chunk geometry. 0 keeps vanilla's count, which it derives from ");
-        add("chunkPreload", Category.OPTIMIZATION, true, 0, 1, 0, false,
+        add("chunkPreload", Category.OPTIMIZATION, true, 0, 1, 0, true,
                 "Let chunks outside the view be rebuilt. Vanilla only ever schedules chunks that are ");
         add("dropVanillaBuffers", Category.OPTIMIZATION, true, 0, 1, 1, true,
                 "Stop filling the game's own chunk buffers once Vulkan has the geometry. The world ");
@@ -252,7 +252,7 @@ public final class Settings {
                 "Stop drawing entities past this many blocks. 0 keeps vanilla's per-entity limit.");
         add("explosionParticles", Category.OPTIMIZATION, false, 0, 20000, 0, false,
                 "How many particles one tick's explosions may spawn before they are thinned. ");
-        add("fastFrustumTest", Category.OPTIMIZATION, true, 0, 1, 1, false,
+        add("fastFrustumTest", Category.OPTIMIZATION, true, 0, 1, 1, true,
                 "Decide whether a box is off screen from its far corner rather than from all ");
         add("fastRebuildNear", Category.OPTIMIZATION, true, 0, 1, 0, false,
                 "Hand the last loop of the terrain setup only the chunks it can act on. That loop ");
@@ -264,21 +264,21 @@ public final class Settings {
                 "Near clipping plane in hundredths of a block. 0 keeps vanilla's 0.05, which at long ");
         add("ownVisibilityWalk", Category.OPTIMIZATION, true, 0, 1, 1, false,
                 "Run this mod's own chunk visibility search instead of the game's. Same answer, ");
-        add("shortEntitySections", Category.OPTIMIZATION, true, 0, 1, 1, false,
+        add("shortEntitySections", Category.OPTIMIZATION, true, 0, 1, 1, true,
                 "Hand the entity and block-entity passes only the sections that can hold ");
-        add("shortLayerSections", Category.OPTIMIZATION, true, 0, 1, 1, false,
+        add("shortLayerSections", Category.OPTIMIZATION, true, 0, 1, 1, true,
                 "Give the game's own layer filter the sections that hold blocks instead of every ");
-        add("smartAnimations", Category.OPTIMIZATION, true, 0, 1, 0, false,
+        add("smartAnimations", Category.OPTIMIZATION, true, 0, 1, 0, true,
                 "Update only the animated block textures that are actually on screen. Vanilla ");
         add("tileEntityDistance", Category.OPTIMIZATION, false, 0, 128, 0, false,
                 "Stop drawing chests, signs and other block entities past this many blocks. 0 keeps vanilla's.");
         add("visibilitySeedCache", Category.OPTIMIZATION, true, 0, 1, 1, false,
                 "Reuse the seed of the chunk visibility search while the camera stays in the same ");
-        add("vulkanParticles", Category.OPTIMIZATION, true, 0, 1, 1, false,
+        add("vulkanParticles", Category.OPTIMIZATION, true, 0, 1, 1, true,
                 "Draw particles with Vulkan. The game still decides where every particle is and ");
         add("vulkanTranslucent", Category.OPTIMIZATION, true, 0, 1, 1, true,
                 "Draw water and glass in Vulkan rather than leaving them on the OpenGL path. Not ");
-        add("vulkanWeather", Category.OPTIMIZATION, true, 0, 1, 1, false,
+        add("vulkanWeather", Category.OPTIMIZATION, true, 0, 1, 1, true,
                 "The same for rain and snow. A separate switch from the one above so that either ");
         add("atlasPixelsSeen", Category.ADVANCED, false, 0, 65536, 0, true,
                 "Remembered, not set: how many pixels across the block atlas was last time. ");
@@ -290,7 +290,7 @@ public final class Settings {
                 "Skip triangles facing away from the camera. Off is for diagnosing geometry only.");
         add("depthBlitEnabled", Category.ADVANCED, true, 0, 1, 1, true,
                 "Copy Vulkan depth into the game's depth buffer with glBlitFramebuffer instead of a shader.");
-        add("entityCapture", Category.ADVANCED, true, 0, 1, 0, false,
+        add("entityCapture", Category.ADVANCED, true, 0, 1, 0, true,
                 "Read what the game draws for every creature, and draw none of it. The first step ");
         add("flatBlockColours", Category.ADVANCED, true, 0, 1, 0, true,
                 "Draw every block face in one flat colour by reading the smallest level of the ");
@@ -326,7 +326,7 @@ public final class Settings {
                 "Seconds between diagnostics snapshots.");
         add("vulkanDevice", Category.ADVANCED, false, -1, 7, -1, true,
                 "Which GPU Vulkan renders on, by the number the log gives it. -1 chooses ");
-        add("vulkanEntities", Category.ADVANCED, true, 0, 1, 1, false,
+        add("vulkanEntities", Category.ADVANCED, true, 0, 1, 1, true,
                 "Draw creatures through Vulkan instead of letting the game draw them. ");
     }
 }

@@ -202,6 +202,14 @@ public class SettingsScreen extends Screen {
             java.util.Arrays.asList("rayTracing", "rayTracingRadius", "tracedLights",
                     "tracedBlockLight", "temporalAccumulation"));
 
+    /**
+     * Settings whose cost does not exist on this version: 1.16.5 seeds its
+     * visibility search with no flood fill to cache, and batches block entity
+     * models into one buffer, so there is nothing for these to save.
+     */
+    private static final java.util.Set<String> NOT_NEEDED = new java.util.HashSet<>(
+            java.util.Arrays.asList("visibilitySeedCache", "cacheBlockEntityModels"));
+
     private ITextComponent label(Settings.Setting setting, int value) {
         String shown = setting.bool ? (value != 0 ? "on" : "off") : Integer.toString(value);
         String colour = setting.live ? TextFormatting.WHITE.toString()
@@ -209,6 +217,8 @@ public class SettingsScreen extends Screen {
         String suffix = setting.live ? ""
                 : IMPOSSIBLE.contains(setting.key)
                         ? TextFormatting.DARK_GRAY + "  (needs ray tracing, not on 1.16.5)"
+                        : NOT_NEEDED.contains(setting.key)
+                        ? TextFormatting.DARK_GRAY + "  (not needed on 1.16.5)"
                         : TextFormatting.DARK_GRAY + "  (not yet ported)";
         return new StringTextComponent(colour + setting.title() + ": "
                 + (setting.live ? TextFormatting.YELLOW : TextFormatting.DARK_GRAY) + shown
@@ -275,6 +285,8 @@ public class SettingsScreen extends Screen {
                         + (IMPOSSIBLE.contains(hovered.key)
                                 ? "Needs ray tracing, which the Vulkan bindings of this game "
                                         + "version cannot reach."
+                                : NOT_NEEDED.contains(hovered.key)
+                                ? "The cost this saves on 1.12.2 does not exist on this version."
                                 : "Remembered, but nothing reads it on this version yet.")));
             }
             renderComponentTooltip(matrices, lines, mouseX, mouseY);
