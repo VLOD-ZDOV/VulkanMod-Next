@@ -6,6 +6,7 @@
   "plugin": "net.vulkanmodnext.EarlySetup",
   "minVersion": "0.8",
   "client": [
+    "BackgroundThrottleMixin",
     "BufferBuilderAccess",
     "ChunkBufferLayerMixin",
     "FrameEndMixin",

@@ -222,6 +222,17 @@ public final class VulkanConfig {
                 Long.toString(SETTINGS_VERSION.incrementAndGet()));
     }
 
+    /**
+     * Tells the renderer to re-read its properties, for a property that is not
+     * a setting and so never goes through {@link #publish()} — the background
+     * frame cap's "frames are being held back" is one. Without it the renderer
+     * sees the stamp unchanged and keeps what it read last.
+     */
+    public static void settingsMoved() {
+        System.setProperty("vulkanmodnext.settingsVersion",
+                Long.toString(SETTINGS_VERSION.incrementAndGet()));
+    }
+
     /** Keys a launcher flag owns, so the config file never takes them back. */
     private static final java.util.Set<String> fromCommandLine =
             new java.util.HashSet<>();
