@@ -12,6 +12,8 @@
     "ChunkUploadMixin",
     "ChunkRenderAccess",
     "LightTextureAccess",
+    "MaterialLayerMixin",
+    "MaterialTagMixin",
     "StartupMixin",
     "TerrainDrawMixin",
     "WorldRendererAccess",

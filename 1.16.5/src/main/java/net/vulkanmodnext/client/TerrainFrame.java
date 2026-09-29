@@ -284,6 +284,11 @@ public final class TerrainFrame {
         }
         if (atlas != sentAtlas) {
             context.updateAtlas(atlas);
+            // After the atlas, and every time it is sent: stitching decides
+            // afresh where each sprite lands, and the rectangles are what the
+            // translucent layer's material is read from. See MaterialSprites.
+            MaterialSprites.handOver(context, Minecraft.getInstance().getModelManager()
+                    .getAtlas(PlayerContainer.BLOCK_ATLAS));
             sentAtlas = atlas;
         }
         if (lightmap != sentLightmap) {

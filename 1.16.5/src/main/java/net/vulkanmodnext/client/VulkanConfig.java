@@ -37,6 +37,7 @@ public final class VulkanConfig {
 
     public static synchronized void load(File configDirectory) {
         file = new File(configDirectory, "vulkanmodnext.properties");
+        takeCommandLine();
         for (Settings.Setting setting : Settings.all()) {
             VALUES.put(setting.key, setting.fallback);
         }
@@ -240,7 +241,40 @@ public final class VulkanConfig {
         return null;
     }
 
+    /**
+     * Values given on the command line as {@code -Dvulkanmodnext.<key>}, for
+     * this run only.
+     *
+     * The settings in {@link #PUBLISHED} already honour a launcher flag: the
+     * renderer reads the property itself. The ones the game half acts on did
+     * not, so {@code -Pset=materialTags=true} put a property nobody read and
+     * the run measured the config file. Kept apart from the stored values so a
+     * slider moved during such a run does not write the flag into the file.
+     */
+    private static final Map<String, Integer> COMMAND_LINE = new ConcurrentHashMap<>();
+
+    private static void takeCommandLine() {
+        for (Settings.Setting setting : Settings.all()) {
+            String given = System.getProperty("vulkanmodnext." + setting.key);
+            if (given == null) {
+                continue;
+            }
+            given = given.trim();
+            try {
+                int value = "true".equalsIgnoreCase(given) ? 1
+                        : "false".equalsIgnoreCase(given) ? 0 : Integer.parseInt(given);
+                COMMAND_LINE.put(setting.key, clamp(setting, value));
+            } catch (NumberFormatException ignored) {
+                // Not ours to interpret; the stored value stands.
+            }
+        }
+    }
+
     public static int get(String key) {
+        Integer forced = COMMAND_LINE.get(key);
+        if (forced != null) {
+            return forced;
+        }
         Integer value = VALUES.get(key);
         return value == null ? 0 : value;
     }
@@ -250,7 +284,11 @@ public final class VulkanConfig {
     }
 
     public static void set(Settings.Setting setting, int value) {
+        int before = get(setting.key);
         VALUES.put(setting.key, clamp(setting, value));
+        if ("materialTags".equals(setting.key) && before != get(setting.key)) {
+            rebuildWorld("material tags");
+        }
         // The renderer reads settings as system properties, so a value that
         // only reaches this map is a value the picture never sees. Every way
         // of changing a setting goes through here, which is why it is here and
@@ -259,14 +297,36 @@ public final class VulkanConfig {
     }
 
     public static void reset() {
+        int tagsBefore = get("materialTags");
         for (Settings.Setting setting : Settings.all()) {
             VALUES.put(setting.key, setting.fallback);
+        }
+        if (tagsBefore != get("materialTags")) {
+            rebuildWorld("material tags");
         }
         // Same reason as in set(): a value that only reaches this map is a
         // value the picture never sees. Written out separately rather than by
         // calling set() in the loop, so the renderer is told once instead of a
         // hundred and six times.
         publish();
+    }
+
+    /**
+     * Rebuilds every chunk, for a setting whose effect is written into the
+     * geometry while a chunk is built.
+     *
+     * Without it the world is left half done — chunks built before the switch
+     * carry nothing, the ones after carry the new answer — and stays that way
+     * until each chunk is rebuilt for some other reason. That looks like an
+     * effect that works in some places and not others, and sends the search
+     * into the effect rather than to the chunk.
+     */
+    private static void rebuildWorld(String why) {
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc != null && mc.levelRenderer != null && mc.level != null) {
+            VulkanModNext.LOGGER.info("{} changed: rebuilding every chunk", why);
+            mc.levelRenderer.allChanged();
+        }
     }
 
     /**
