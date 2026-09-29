@@ -190,11 +190,26 @@ public class SettingsScreen extends Screen {
         return label(setting, VulkanConfig.get(setting.key));
     }
 
+    /**
+     * Settings that cannot work on this version at all, as opposed to not yet.
+     *
+     * Ray tracing needs Vulkan 1.2 and the acceleration structure extension,
+     * and the LWJGL this version of the game ships predates both. "Not yet
+     * ported" would promise a player something that is not coming; the label
+     * says which of the two it is.
+     */
+    private static final java.util.Set<String> IMPOSSIBLE = new java.util.HashSet<>(
+            java.util.Arrays.asList("rayTracing", "rayTracingRadius", "tracedLights",
+                    "tracedBlockLight", "temporalAccumulation"));
+
     private ITextComponent label(Settings.Setting setting, int value) {
         String shown = setting.bool ? (value != 0 ? "on" : "off") : Integer.toString(value);
         String colour = setting.live ? TextFormatting.WHITE.toString()
                 : TextFormatting.DARK_GRAY.toString();
-        String suffix = setting.live ? "" : TextFormatting.DARK_GRAY + "  (not yet ported)";
+        String suffix = setting.live ? ""
+                : IMPOSSIBLE.contains(setting.key)
+                        ? TextFormatting.DARK_GRAY + "  (needs ray tracing, not on 1.16.5)"
+                        : TextFormatting.DARK_GRAY + "  (not yet ported)";
         return new StringTextComponent(colour + setting.title() + ": "
                 + (setting.live ? TextFormatting.YELLOW : TextFormatting.DARK_GRAY) + shown
                 + suffix);
@@ -257,7 +272,10 @@ public class SettingsScreen extends Screen {
             }
             if (!hovered.live) {
                 lines.add(new StringTextComponent(TextFormatting.DARK_GRAY
-                        + "Remembered, but nothing reads it on this version yet."));
+                        + (IMPOSSIBLE.contains(hovered.key)
+                                ? "Needs ray tracing, which the Vulkan bindings of this game "
+                                        + "version cannot reach."
+                                : "Remembered, but nothing reads it on this version yet.")));
             }
             renderComponentTooltip(matrices, lines, mouseX, mouseY);
         }

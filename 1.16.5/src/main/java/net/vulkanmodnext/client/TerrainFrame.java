@@ -97,6 +97,12 @@ public final class TerrainFrame {
     private static boolean gather(VkContext context, WorldRenderer renderer, RenderType layer,
                                   MatrixStack matrices,
                                   double viewX, double viewY, double viewZ) {
+        // Leaving before the chunk walk when the layer is not ours: water and
+        // glass make a long list at a high render distance, and walking it to
+        // throw it away is the whole cost of a layer and none of the use.
+        if (layer == RenderType.translucent() && !VulkanConfig.on("vulkanTranslucent")) {
+            return false;
+        }
         java.util.List<?> visible = ((WorldRendererAccess) renderer).vulkanmodnext$visibleChunks();
         int count = 0;
         int at = 0;
@@ -407,6 +413,7 @@ public final class TerrainFrame {
                 // them before that leaves the layer to a renderer that declines
                 // it and to buffers that are empty, and an ocean turns into a
                 // hole in the world with nothing in any log to say so.
+                && VulkanConfig.on("vulkanTranslucent")
                 && context.drawsTranslucent();
         if (want == droppingVanillaBuffers) {
             return;
