@@ -192,16 +192,24 @@ public final class TerrainFrame {
             context.setRainStrength(mc.level.getRainLevel(mc.getFrameTime()));
         }
 
-        FloatBuffer colour = scratch();
-        GL11C.glGetFloatv(GL11.GL_FOG_COLOR, colour);
-        fog[0] = colour.get(0);
-        fog[1] = colour.get(1);
-        fog[2] = colour.get(2);
-        int mode = GL11C.glGetInteger(GL11.GL_FOG_MODE);
-        fog[3] = mode == GL11.GL_LINEAR ? 1.0f : 0.0f;
-        fog[4] = GL11C.glGetFloat(GL11.GL_FOG_START);
-        fog[5] = GL11C.glGetFloat(GL11.GL_FOG_END);
-        fog[6] = GL11C.glGetFloat(GL11.GL_FOG_DENSITY);
+        if (VulkanConfig.on("fog")) {
+            FloatBuffer colour = scratch();
+            GL11C.glGetFloatv(GL11.GL_FOG_COLOR, colour);
+            fog[0] = colour.get(0);
+            fog[1] = colour.get(1);
+            fog[2] = colour.get(2);
+            int mode = GL11C.glGetInteger(GL11.GL_FOG_MODE);
+            fog[3] = mode == GL11.GL_LINEAR ? 1.0f : 0.0f;
+            fog[4] = GL11C.glGetFloat(GL11.GL_FOG_START);
+            fog[5] = GL11C.glGetFloat(GL11.GL_FOG_END);
+            fog[6] = GL11C.glGetFloat(GL11.GL_FOG_DENSITY);
+        } else {
+            // Mode 0: the shader skips the blend. Only our terrain loses its
+            // fog — the game's sky, creatures and water keep theirs, which is
+            // what the setting says: the world ends in a hard edge instead of
+            // fading, a little faster.
+            fog[3] = 0.0f;
+        }
         context.setFogState(fog);
 
         // Where the camera is, in the space the matrix maps to the origin. On
