@@ -15,6 +15,7 @@
     "MaterialLayerMixin",
     "MaterialTagMixin",
     "SceneEffectsMixin",
+    "SkySunMixin",
     "StartupMixin",
     "TerrainDrawMixin",
     "WorldRendererAccess",
