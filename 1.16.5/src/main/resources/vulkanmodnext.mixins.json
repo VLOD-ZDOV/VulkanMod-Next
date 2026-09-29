@@ -26,7 +26,9 @@
     "VertexBufferMixin",
     "VertexBufferUploadMixin",
     "WeatherDisplayMixin",
-    "WorldTimeDisplayMixin"
+    "WorldTimeDisplayMixin",
+    "EntityRenderDistanceMixin",
+    "TileEntityRenderDistanceMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }
