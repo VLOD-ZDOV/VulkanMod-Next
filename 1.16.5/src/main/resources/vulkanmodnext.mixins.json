@@ -45,7 +45,7 @@
     "EntitySectionsMixin",
     "ChunkPreloadMixin",
     "CompiledChunkSpritesMixin",
-    "ItemSpriteMixin"
+    "ItemSpriteMixin",
     "EntityPassMixin",
     "EntityBufferMixin",
     "ModelPartMixin",
@@ -55,5 +55,7 @@
     "TextureStateAccess",
     "RenderStateAccess"
   ],
-  "injectors": { "defaultRequire": 1 }
+  "injectors": {
+    "defaultRequire": 1
+  }
 }
