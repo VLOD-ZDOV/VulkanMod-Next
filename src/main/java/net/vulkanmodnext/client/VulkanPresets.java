@@ -559,6 +559,14 @@ public final class VulkanPresets {
         // the same broken picture with different lighting.
         VulkanConfig.clearDiagnosticViews();
         VulkanConfig.setTerrainEnabled(true);
+        // Owned for the same reason as the terrain switch above. Water
+        // reflection, waves, refraction, caustics, ice shine and the sun's glint
+        // all live in the Vulkan water-and-glass pass; its own tooltip invites
+        // turning it off when water looks wrong against a mob, and every preset
+        // but Stable then turned those sliders up while leaving the pass that
+        // draws them switched off — a showcase preset that showed none of its
+        // water. Stable already had it right, through resetToDefaults.
+        VulkanConfig.setVulkanTranslucent(VulkanConfig.DEF_VULKAN_TRANSLUCENT);
         VulkanConfig.setEntityDistance(look.entityDistance);
         VulkanConfig.setTileEntityDistance(look.tileEntityDistance);
         VulkanConfig.setBackgroundFpsLimit(look.backgroundFps);
