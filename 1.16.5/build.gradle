@@ -96,15 +96,16 @@ minecraft {
             // -PflightTag, -PflightSeed, -PflightDistance, -PflightSeconds,
             // -PflightSettle, -PflightShots, -PflightPatience, -PflightPos,
             // -PflightProfiler, -PflightPreset, -PflightHour, -PflightWeather,
-            // -PflightPairs, -PflightClouds, -PflightPitch, -PflightWindow and
-            // -PflightYaw and -PflightFramerate.
+            // -PflightPairs, -PflightClouds, -PflightPitch, -PflightWindow,
+            // -PflightYaw, -PflightFramerate and -PflightHold (an item id for the
+            // main hand, e.g. minecraft:torch).
             if (project.hasProperty('flight')) {
                 jvmArgs '-Dvulkanmodnext.flight=' + project.property('flight')
                 ['flightTag', 'flightSeed', 'flightDistance', 'flightSeconds',
                  'flightSettle', 'flightShots', 'flightPatience', 'flightPos',
                  'flightProfiler', 'flightPreset', 'flightHour', 'flightWeather',
                  'flightPairs', 'flightClouds', 'flightPitch', 'flightWindow',
-                 'flightYaw', 'flightFramerate'].each { name ->
+                 'flightYaw', 'flightFramerate', 'flightHold'].each { name ->
                     if (project.hasProperty(name)) {
                         jvmArgs '-Dvulkanmodnext.' + name + '=' + project.property(name)
                     }
