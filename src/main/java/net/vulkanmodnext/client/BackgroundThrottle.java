@@ -42,7 +42,13 @@ public final class BackgroundThrottle {
     /** Called at the end of every rendered frame. */
     public static void afterFrame() {
         int limit = VulkanConfig.getBackgroundFpsLimit();
-        boolean throttling = limit > 0 && !ANDROID && !Display.isActive();
+        // Not during a flight. A flight is a measurement, it pins every other
+        // frame cap it knows of, and whether its window has focus is not up to
+        // it — on a machine where somebody is using something else, it does
+        // not. Three runs came back "median 10, 5% low 10, worst 10", a number
+        // that flat is a cap and not a frame rate, and it was read as the
+        // renderer being slow.
+        boolean throttling = limit > 0 && !ANDROID && !Display.isActive() && !Flight.asked();
         if (throttling != published) {
             published = throttling;
             System.setProperty("vulkanmodnext.frameThrottled", Boolean.toString(throttling));
