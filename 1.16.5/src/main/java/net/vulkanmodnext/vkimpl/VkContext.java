@@ -884,6 +884,31 @@ public final class VkContext {
         }
     }
 
+    public void applySceneBloom(int sceneGlTexture) {
+        // Not synchronized: this runs on the render thread inside the game's
+        // own world pass, and it touches only OpenGL objects this renderer
+        // owns. Taking the monitor here would put it behind whatever a chunk
+        // builder is doing, in the middle of a frame.
+        VkTerrainRenderer renderer = terrainRenderer;
+        if (initialized && renderer != null) {
+            renderer.applySceneBloom(sceneGlTexture);
+        }
+    }
+
+    public void applySceneOcclusion(int sceneGlTexture) {
+        VkTerrainRenderer renderer = terrainRenderer;
+        if (initialized && renderer != null) {
+            renderer.applySceneOcclusion(sceneGlTexture);
+        }
+    }
+
+    public void applySceneTone(int sceneGlTexture) {
+        VkTerrainRenderer renderer = terrainRenderer;
+        if (initialized && renderer != null) {
+            renderer.applySceneTone(sceneGlTexture);
+        }
+    }
+
     public synchronized void setMaterialSprites(int[] materials, float[] rects, int count) {
         if (!initialized) {
             return;
