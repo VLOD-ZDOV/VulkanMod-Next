@@ -2,6 +2,65 @@
 
 ## [Unreleased]
 
+- **Fixed: on some drivers the world could come out black, or the occlusion
+  and light shafts switch themselves off, after the first frame or any resize.**
+  A check of the shared targets set the game's own frame to read from nothing,
+  and every later copy out of that frame failed. It was the same mistake as an
+  old black-world bug on one make of card, back again in one line.
+
+- **Fixed: resizing the window could leave the renderer a frame out of step with
+  the game for the rest of the session.** The handshake between the two sides
+  counted one signal too many after a resize, and from then on each frame waited
+  on the one before it. Toggling fullscreen did the same.
+
+- **Fixed: the renderer could free geometry the water and glass pass was still
+  drawing from.** The start of each frame waited for the solid pass of an
+  earlier frame but not for its water pass, which is submitted later. On a slow
+  frame that is a read of freed memory on the graphics card.
+
+- **Fixed: a driver that follows the Vulkan rules to the letter could draw every
+  chunk in the same place.** Each draw named its chunk in a way the device had
+  not been told to allow. Where the device allows it, it is now asked for; where
+  it does not, chunks are drawn one call at a time instead.
+
+- **Fixed: presets could leave Vulkan Water and Glass switched off.** Every
+  preset but Stable turned up the water effects without turning back on the
+  pass that draws them, so a showcase preset could show no water effects at all.
+
+- **Fixed (Windows): every resize kept its render targets in video memory until
+  the game closed.** The handles they were shared through were kept open for the
+  whole session, and an open handle keeps its memory alive. They are now closed
+  as soon as nothing uses them.
+
+- **Ray-traced shadows no longer build from geometry outside its buffer.** A
+  chunk whose geometry does not lie inside the buffer is left out and reported
+  once, instead of being read past the end.
+
+- **Fixed: the game could freeze forever if the graphics driver gave up.** When
+  the card rejects a batch of commands it kills the channel they were sent on,
+  and anything already waiting for that batch to finish waits for something
+  that is never going to happen. One wait in the water and glass pass had no
+  time limit, so that turned into a window that had simply stopped moving: no
+  crash, no error, no message, no processor use, nothing in any log. It now
+  gives up after two seconds — the pass itself takes a fraction of a
+  millisecond, so nothing this catches is a slow frame — writes what the driver
+  said into the log, and hands that layer back to the game, which draws its own
+  water for the rest of the session. A worse picture than ours, and an
+  incomparably better one than a game you have to kill.
+
+  The same fix had to be made twice. Closing the game after that had happened
+  waited for the card to finish work it was never going to finish, so the
+  window went away, the game reported that it had shut down, and the process
+  stayed alive for as long as you left it. It now closes.
+
+- **Fixed: the game could die on the way out.** Closing the game ended with
+  `FATAL ERROR in native method ... The JVM will abort execution` instead of a
+  clean exit. The mod was handing OpenGL objects back from the JVM's shutdown
+  hook, where there is no OpenGL context left to hand them to — and a call like
+  that does not fail, it kills the process. Nothing was lost when it happened
+  (the world is already saved by then), but the game reported a crash where
+  there was none.
+
 ## [0.10.0-alpha.5]
 
 The fifth alpha. A sweep of the code for bugs and for comments that no longer
@@ -83,31 +142,6 @@ under what cast them. None of it has been flown yet — report against it.
   for a file called `vulkanmod112-*.jar` when it checks for updates, and will
   not notice the first release under the new name. From this version on both
   names are recognised, so the next rename will not do it again.
-
-- **Fixed: the game could freeze forever if the graphics driver gave up.** When
-  the card rejects a batch of commands it kills the channel they were sent on,
-  and anything already waiting for that batch to finish waits for something
-  that is never going to happen. One wait in the water and glass pass had no
-  time limit, so that turned into a window that had simply stopped moving: no
-  crash, no error, no message, no processor use, nothing in any log. It now
-  gives up after two seconds — the pass itself takes a fraction of a
-  millisecond, so nothing this catches is a slow frame — writes what the driver
-  said into the log, and hands that layer back to the game, which draws its own
-  water for the rest of the session. A worse picture than ours, and an
-  incomparably better one than a game you have to kill.
-
-  The same fix had to be made twice. Closing the game after that had happened
-  waited for the card to finish work it was never going to finish, so the
-  window went away, the game reported that it had shut down, and the process
-  stayed alive for as long as you left it. It now closes.
-
-- **Fixed: the game could die on the way out.** Closing the game ended with
-  `FATAL ERROR in native method ... The JVM will abort execution` instead of a
-  clean exit. The mod was handing OpenGL objects back from the JVM's shutdown
-  hook, where there is no OpenGL context left to hand them to — and a call like
-  that does not fail, it kills the process. Nothing was lost when it happened
-  (the world is already saved by then), but the game reported a crash where
-  there was none.
 
 - **The jar says which Minecraft it is for.** `vulkanmodnext-1.12.2-0.10.0-alpha.4.jar`
   rather than `vulkanmodnext-0.10.0-alpha.4.jar`. With two builds of one mod there was
