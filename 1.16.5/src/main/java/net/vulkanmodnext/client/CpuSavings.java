@@ -26,6 +26,10 @@ public final class CpuSavings {
 
     public static boolean fastFrustumTest;
     public static boolean shortLayerSections;
+    public static boolean shortEntitySections;
+
+    /** Visible-list entries the game's block-entity pass walked. */
+    private static long blockEntityWalked;
 
     /** Visible-list entries the Vulkan terrain draw walked, all layers together. */
     private static long layerWalked;
@@ -45,11 +49,16 @@ public final class CpuSavings {
     public static void beginFrame() {
         fastFrustumTest = VulkanConfig.on("fastFrustumTest");
         shortLayerSections = VulkanConfig.on("shortLayerSections");
+        shortEntitySections = VulkanConfig.on("shortEntitySections");
         ShortSections.beginFrame();
     }
 
     public static void countLayerWalk(int entries) {
         layerWalked += entries;
+    }
+
+    public static void countBlockEntityWalk(int entries) {
+        blockEntityWalked += entries;
     }
 
     public static void countFrustumTest(boolean answered) {
@@ -68,6 +77,7 @@ public final class CpuSavings {
         return "cpu savings: frustum tests " + frustumTests + " (" + frustumAnswered
                 + " by the far corner), chunks built on the render thread " + syncBuilds
                 + " (" + syncBuildNanos / 1000000L + " ms), terrain layer walk " + layerWalked
-                + " entries; " + ShortSections.stats();
+                + " entries, block-entity walk " + blockEntityWalked + " entries; "
+                + ShortSections.stats();
     }
 }

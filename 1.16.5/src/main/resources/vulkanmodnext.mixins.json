@@ -41,7 +41,8 @@
     "AnimatedTexturesMixin",
     "FrustumTestMixin",
     "BuildNearOffThreadMixin",
-    "BuildNearTimingMixin"
+    "BuildNearTimingMixin",
+    "EntitySectionsMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }
