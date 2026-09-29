@@ -79,8 +79,10 @@ public final class TerrainFrame {
         if (context == null || frameProjection == null) {
             return false;
         }
+        boolean drawn = false;
         try {
-            return gather(context, renderer, layer, matrices, viewX, viewY, viewZ);
+            drawn = gather(context, renderer, layer, matrices, viewX, viewY, viewZ);
+            return drawn;
         } catch (Throwable failed) {
             markBroken("threw while drawing a layer");
             if (!announced) {
@@ -91,6 +93,15 @@ public final class TerrainFrame {
             // Never the mod's fault that a frame is missing: whatever went
             // wrong here, vanilla still draws the world.
             return false;
+        } finally {
+            // The one way creatures taken this frame can still go missing:
+            // they wait in the translucent pass, and the game has just been
+            // handed that layer back. Counted, not recovered — the game's own
+            // drawing of them was cancelled a moment ago.
+            if (!drawn && layer == RenderType.translucent()
+                    && EntityGeometry.submittedThisFrame()) {
+                EntityGeometry.translucentRefused();
+            }
         }
     }
 
@@ -157,10 +168,10 @@ public final class TerrainFrame {
 
         int ordinal = ordinalOf(layer);
         boolean translucent = ordinal == 3;
-        // An empty translucent layer is not the end of it: particles and rain
-        // are drawn in that same pass, and a frame with no water in view still
-        // has to run it for them. Standing in a desert and breaking a block
-        // put the particles nowhere at all on 1.12.2 until it did.
+        // An empty translucent layer is not the end of it: particles, rain and
+        // creatures are drawn in that same pass, and a frame with no water in
+        // view still has to run it for them. Standing in a desert and breaking
+        // a block put the particles nowhere at all on 1.12.2 until it did.
         if (!VulkanConfig.isTerrainEnabled() || ordinal < 0 || (count == 0 && !translucent)) {
             return false;
         }
@@ -183,7 +194,8 @@ public final class TerrainFrame {
                         viewX, viewY, viewZ);
                 int weather = WeatherHooks.capture(context, renderer, layer, matrices,
                         viewX, viewY, viewZ);
-                if (count == 0 && particles + weather == 0) {
+                if (count == 0 && particles + weather == 0
+                        && !EntityGeometry.submittedThisFrame()) {
                     return false;
                 }
             }
@@ -207,6 +219,12 @@ public final class TerrainFrame {
         }
         taken[ordinal] += drawn ? 1 : 0;
         refused[ordinal] += drawn ? 0 : 1;
+        if (ordinal == 2) {
+            // The last opaque layer is the one that submits the frame, and
+            // only after it can there be a translucent pass to draw creatures
+            // in. Asked by EntityGeometry when the entity pass opens.
+            opaqueTaken = drawn;
+        }
         if (!drawn && droppingVanillaBuffers) {
             markBroken("declined a layer");
         }
@@ -421,7 +439,16 @@ public final class TerrainFrame {
         frames++;
         ParticleHooks.beginFrame();
         WeatherHooks.beginFrame();
+        opaqueTaken = false;
+        EntityGeometry.newFrame();
         updateVanillaBufferDrop();
+    }
+
+    /** Whether this frame's opaque layers went to Vulkan; see {@link #layer}. */
+    private static boolean opaqueTaken;
+
+    public static boolean opaqueTakenThisFrame() {
+        return opaqueTaken;
     }
 
     /**

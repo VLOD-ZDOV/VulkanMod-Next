@@ -46,6 +46,14 @@
     "ChunkPreloadMixin",
     "CompiledChunkSpritesMixin",
     "ItemSpriteMixin"
+    "EntityPassMixin",
+    "EntityBufferMixin",
+    "ModelPartMixin",
+    "ModelPartAccess",
+    "RenderTypeAccess",
+    "RenderTypeStateAccess",
+    "TextureStateAccess",
+    "RenderStateAccess"
   ],
   "injectors": { "defaultRequire": 1 }
 }

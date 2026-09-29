@@ -916,8 +916,11 @@ public final class VkContext {
     }
 
     /**
-     * Whether particles and weather can go through Vulkan: the translucent
-     * pass, and the sprite pipeline inside it. See client/Sprites.
+     * Whether particles, weather and creatures can go through Vulkan here.
+     *
+     * Always false where {@link #drawsTranslucent} is false, and for the same
+     * reason it is one question rather than two: sprites are drawn inside the
+     * translucent pass, and there is no second place to put them.
      */
     public synchronized boolean drawsSprites() {
         return initialized && interopCapable && terrainRenderer != null
@@ -943,6 +946,34 @@ public final class VkContext {
             return false;
         }
         return terrainRenderer.submitSprites(vertices, vertexCount, spriteSlot, alphaCutoff);
+    }
+
+    /**
+     * The sprite slot holding an OpenGL texture, copying it in on first sight.
+     *
+     * Zero means there is no room, and the caller is expected to leave that
+     * creature to the game rather than to lose it.
+     */
+    public synchronized int spriteSlotForTexture(int glTextureId) {
+        if (!initialized || !interopCapable || terrainRenderer == null) {
+            return 0;
+        }
+        return terrainRenderer.spriteSlotForTexture(glTextureId);
+    }
+
+    /**
+     * One batch of camera-relative quads in the 28-byte particle layout, with
+     * a colour laid over the skin ({@code overlay}, ARGB, alpha = strength).
+     *
+     * @return false when the renderer could not take the batch
+     */
+    public synchronized boolean submitSprites(ByteBuffer vertices, int vertexCount, int spriteSlot,
+                                              float alphaCutoff, int overlay, boolean glint) {
+        if (!initialized || !interopCapable || terrainRenderer == null) {
+            return false;
+        }
+        return terrainRenderer.submitSprites(vertices, vertexCount, spriteSlot, alphaCutoff,
+                overlay, glint);
     }
 
     /** Animation frames for the copy of the block atlas; see AtlasAnimations. */
