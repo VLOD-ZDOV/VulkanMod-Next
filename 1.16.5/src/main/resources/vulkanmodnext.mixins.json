@@ -30,7 +30,9 @@
     "EntityRenderDistanceMixin",
     "TileEntityRenderDistanceMixin",
     "ExplosionParticleMixin",
-    "NearPlaneMixin"
+    "NearPlaneMixin",
+    "ChunkBuildThreadsMixin",
+    "ChunkBuilderExecutorMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }

@@ -30,6 +30,9 @@ public final class ClientTicks {
             DevWorld.openIfAsked();
             return;
         }
+        // Outside a screen, so a slider dragged there costs one rebuild after
+        // it is let go rather than one per step.
+        ChunkBuildThreads.tick();
         // In a world, with the frame just finished: the one moment the picture
         // can be read back and compared against the same route without us.
         FrameProbe.endFrame();
