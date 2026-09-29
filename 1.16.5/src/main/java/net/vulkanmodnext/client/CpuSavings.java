@@ -27,6 +27,7 @@ public final class CpuSavings {
     public static boolean fastFrustumTest;
     public static boolean shortLayerSections;
     public static boolean shortEntitySections;
+    public static boolean smartAnimations;
 
     /** Visible-list entries the game's block-entity pass walked. */
     private static long blockEntityWalked;
@@ -53,6 +54,7 @@ public final class CpuSavings {
         fastFrustumTest = VulkanConfig.on("fastFrustumTest");
         shortLayerSections = VulkanConfig.on("shortLayerSections");
         shortEntitySections = VulkanConfig.on("shortEntitySections");
+        smartAnimations = VulkanConfig.on("smartAnimations");
         ShortSections.beginFrame();
     }
 
@@ -86,6 +88,6 @@ public final class CpuSavings {
                 + " (" + syncBuildNanos / 1000000L + " ms), terrain layer walk " + layerWalked
                 + " entries, block-entity walk " + blockEntityWalked + " entries, off-screen "
                 + "sections preloaded " + preloaded + "; "
-                + ShortSections.stats();
+                + ShortSections.stats() + "; " + AnimatedSprites.stats();
     }
 }
