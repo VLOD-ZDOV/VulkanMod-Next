@@ -738,6 +738,7 @@ public final class Flight {
         // cannot say whether a frame rate moved because the renderer changed or
         // because it drew a different number of chunks.
         VulkanModNext.LOGGER.info("Flight {} {}: {}", TAG, why, TerrainFrame.layerReport());
+        VulkanModNext.LOGGER.info("Flight {} {}", TAG, MaterialRuns.stats());
         net.vulkanmodnext.vkimpl.VkContext context = VulkanStartup.context();
         if (context != null) {
             VulkanModNext.LOGGER.info("Flight {} terrain:\n{}", TAG, context.terrainDiagnostics());

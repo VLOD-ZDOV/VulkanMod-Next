@@ -36,4 +36,8 @@ public interface BufferBuilderAccess {
 
     @Accessor("totalUploadedBytes")
     int vulkanmodnext$uploadedBytes();
+
+    /** Vertices in the layer being built; where the next block's will start. */
+    @Accessor("vertices")
+    int vulkanmodnext$vertices();
 }

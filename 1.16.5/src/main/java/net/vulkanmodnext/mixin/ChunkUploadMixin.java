@@ -6,6 +6,8 @@ import net.minecraft.client.renderer.vertex.VertexBuffer;
 import net.vulkanmodnext.client.ChunkGeometry;
 import net.vulkanmodnext.client.ChunkLayers;
 import net.vulkanmodnext.client.ChunkMirror;
+import net.vulkanmodnext.client.MaterialRuns;
+import net.vulkanmodnext.client.VulkanConfig;
 import net.vulkanmodnext.client.VertexBufferSlot;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -41,7 +43,14 @@ public abstract class ChunkUploadMixin {
         // Before the geometry, and on this thread: this is the last place that
         // knows which layer the slot is for, and the copy needs to know before
         // it decides whether it may sort the quads.
-        ChunkMirror.onLayer(slot, ChunkLayers.isTranslucent(target));
+        boolean translucent = ChunkLayers.isTranslucent(target);
+        ChunkMirror.onLayer(slot, translucent);
+        if (VulkanConfig.on("materialTags")) {
+            // Also before the geometry: this is the last place that still knows
+            // which builder held the chunk, and the runs are keyed by nothing
+            // else.
+            MaterialRuns.publish(slot, builder, translucent);
+        }
         ChunkGeometry.offer(slot, builder);
     }
 }

@@ -52,6 +52,17 @@ public final class ChunkMirror {
         }
     }
 
+    /**
+     * What each run of a chunk layer's vertices is made of, from the builder
+     * thread, ahead of the geometry. See {@link MaterialRuns}.
+     */
+    public static void onMaterials(int slot, int[] runs, int runCount) {
+        VkContext context = VulkanStartup.context();
+        if (context != null) {
+            context.stageChunkMaterials(slot, runs, runCount);
+        }
+    }
+
     /** What a chunk layer is made of, before its geometry follows. */
     public static void onLayer(int slot, boolean translucent) {
         VkContext context = VulkanStartup.context();

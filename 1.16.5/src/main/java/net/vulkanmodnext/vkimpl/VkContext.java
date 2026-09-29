@@ -884,6 +884,26 @@ public final class VkContext {
         }
     }
 
+    public synchronized void setMaterialSprites(int[] materials, float[] rects, int count) {
+        if (!initialized) {
+            return;
+        }
+        terrainRenderer().setMaterialSprites(materials, rects, count);
+    }
+
+    public void stageChunkMaterials(int slot, int[] runs, int runCount) {
+        // Not synchronized, for the same reason as stageChunkBuffer: this
+        // arrives from the chunk builder threads, and the mirror has a lock of
+        // its own for exactly this.
+        if (!initialized) {
+            return;
+        }
+        VkChunkMirror mirror = chunkMirror;
+        if (mirror != null) {
+            mirror.stageMaterials(slot, runs, runCount);
+        }
+    }
+
         public synchronized String chunkMirrorStats() {
         return chunkMirror != null ? chunkMirror.stats() : "mirrored VBOs: 0";
     }
