@@ -170,7 +170,7 @@ public final class Settings {
                 "How much light gets through leaves and plants in a traced shadow. A ray cannot ");
         add("lightSoftness", Category.GENERAL, false, 0, 100, 30, true,
                 "How soft the edge of a shadow cast by a torch or a fire is. Separate from the ");
-        add("moonSize", Category.GENERAL, false, 0, 100, 40, false,
+        add("moonSize", Category.GENERAL, false, 0, 100, 40, true,
                 "How large the moon is drawn. Same trick as the sun: the quad the game gives it ");
         add("overlayEnabled", Category.GENERAL, true, 0, 1, 0, false,
                 "Show the legacy Vulkan diagnostic overlay.");
@@ -178,7 +178,7 @@ public final class Settings {
                 "How many chunks Offscreen Chunk Preload keeps queued for building at once. ");
         add("preloadScan", Category.GENERAL, false, 512, 32768, 4096, false,
                 "How much of the chunk grid Offscreen Chunk Preload looks through each frame ");
-        add("roundMoon", Category.GENERAL, true, 0, 1, 0, false,
+        add("roundMoon", Category.GENERAL, true, 0, 1, 0, true,
                 "Draw the moon as a round disc with a soft glow. The game does not draw a moon so ");
         add("roundSun", Category.GENERAL, true, 0, 1, 0, true,
                 "Draw the sun as a round, warm disc instead of vanilla's square. The picture is ");
@@ -202,7 +202,7 @@ public final class Settings {
                 "How dark the sun's shadow is, traced against the terrain. Needs Terrain ");
         add("sunSize", Category.GENERAL, false, 0, 100, 50, true,
                 "How large the disc is drawn. The quad the game gives the sun cannot be resized ");
-        add("sunWarmth", Category.GENERAL, false, 0, 100, 60, false,
+        add("sunWarmth", Category.GENERAL, false, 0, 100, 60, true,
                 "How far towards orange the rim of the sun goes. 0 leaves it white. The centre ");
         add("temporalAccumulation", Category.GENERAL, false, 0, 100, 60, false,
                 "How much of what a pixel looked like last frame it keeps. A traced shadow is ");
