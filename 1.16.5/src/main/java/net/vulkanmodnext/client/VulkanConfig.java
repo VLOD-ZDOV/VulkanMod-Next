@@ -296,6 +296,28 @@ public final class VulkanConfig {
         publish();
     }
 
+    /**
+     * Many values at once, told to the renderer once — a preset.
+     *
+     * Keys this build does not declare are skipped rather than stored: a
+     * preset written against 1.12.2's list must not grow the file with names
+     * nothing here will ever read back.
+     */
+    public static void setAll(Map<String, Integer> values) {
+        int tagsBefore = get("materialTags");
+        for (Map.Entry<String, Integer> entry : values.entrySet()) {
+            Settings.Setting setting = find(entry.getKey());
+            if (setting != null) {
+                VALUES.put(setting.key, clamp(setting, entry.getValue()));
+            }
+        }
+        publish();
+        save();
+        if (tagsBefore != get("materialTags")) {
+            rebuildWorld("material tags");
+        }
+    }
+
     public static void reset() {
         int tagsBefore = get("materialTags");
         for (Settings.Setting setting : Settings.all()) {

@@ -6,6 +6,7 @@ import net.minecraft.client.gui.widget.button.Button;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.StringTextComponent;
 import net.minecraft.util.text.TextFormatting;
+import net.vulkanmodnext.client.Presets;
 import net.vulkanmodnext.client.Settings;
 import net.vulkanmodnext.client.VulkanConfig;
 
@@ -36,9 +37,11 @@ public class SettingsScreen extends Screen {
     private static final int ROWS = 9;
 
     private final Screen parent;
+    /** Null while the presets page is showing. */
     private Settings.Category category = Settings.Category.GENERAL;
     private List<Settings.Setting> rows;
     private int scroll;
+    private String lastPreset;
 
     public SettingsScreen(Screen parent) {
         super(new StringTextComponent("VulkanMod 1.16.5"));
@@ -47,11 +50,22 @@ public class SettingsScreen extends Screen {
 
     @Override
     protected void init() {
-        rows = Settings.of(category);
+        rows = category == null ? java.util.Collections.emptyList() : Settings.of(category);
         scroll = Math.max(0, Math.min(scroll, Math.max(0, rows.size() - ROWS)));
 
-        int tabWidth = 92;
-        int tabsLeft = this.width / 2 - tabWidth * 2 - 6;
+        int tabWidth = 74;
+        int tabsLeft = this.width / 2 - (tabWidth * 5 + 16) / 2;
+        Button presetsTab = new Button(tabsLeft, 28, tabWidth, 20,
+                new StringTextComponent(category == null ? TextFormatting.WHITE + "Presets"
+                        : TextFormatting.GRAY + "Presets"),
+                pressed -> {
+                    category = null;
+                    scroll = 0;
+                    init();
+                });
+        presetsTab.active = category != null;
+        addButton(presetsTab);
+        tabsLeft += tabWidth + 4;
         Settings.Category[] categories = Settings.Category.values();
         for (int i = 0; i < categories.length; i++) {
             Settings.Category tab = categories[i];
@@ -71,8 +85,31 @@ public class SettingsScreen extends Screen {
         int top = 58;
         int rowWidth = 300;
         int left = this.width / 2 - rowWidth / 2;
+        if (category == null) {
+            // Two columns of four: every preset on one page, no scrolling for
+            // the thing a new player looks for first.
+            int half = (rowWidth - 4) / 2;
+            for (int i = 0; i < Presets.ALL.length; i++) {
+                Presets.Preset preset = Presets.ALL[i];
+                int x = left + (i % 2) * (half + 4);
+                int y = top + (i / 2) * ROW_HEIGHT;
+                addButton(new Button(x, y, half, 20, new StringTextComponent(preset.name),
+                        pressed -> {
+                            preset.apply();
+                            lastPreset = preset.name;
+                            init();
+                        }));
+            }
+        }
         for (int i = 0; i < ROWS && i + scroll < rows.size(); i++) {
             Settings.Setting setting = rows.get(i + scroll);
+            if (!setting.bool && setting.live) {
+                // A slider for a number: the step buttons took a hundred
+                // clicks to cross a 0-100 effect, which is a setting nobody
+                // tries both ends of.
+                addButton(new SettingSlider(left, top + i * ROW_HEIGHT, rowWidth, setting));
+                continue;
+            }
             addButton(new Button(left, top + i * ROW_HEIGHT, rowWidth, 20, label(setting),
                     pressed -> {
                         step(setting, !hasShiftDown());
@@ -116,8 +153,44 @@ public class SettingsScreen extends Screen {
         VulkanConfig.set(setting, next);
     }
 
+    /** A number setting dragged rather than clicked, told to the renderer as it moves. */
+    private final class SettingSlider extends net.minecraft.client.gui.widget.AbstractSlider {
+
+        private final Settings.Setting setting;
+
+        SettingSlider(int x, int y, int width, Settings.Setting setting) {
+            super(x, y, width, 20, StringTextComponent.EMPTY, fraction(setting));
+            this.setting = setting;
+            updateMessage();
+        }
+
+        private int current() {
+            return setting.min + (int) Math.round(value * (setting.max - setting.min));
+        }
+
+        @Override
+        protected void updateMessage() {
+            setMessage(label(setting, current()));
+        }
+
+        @Override
+        protected void applyValue() {
+            if (current() != VulkanConfig.get(setting.key)) {
+                VulkanConfig.set(setting, current());
+            }
+        }
+    }
+
+    private static double fraction(Settings.Setting setting) {
+        int span = setting.max - setting.min;
+        return span <= 0 ? 0.0 : (VulkanConfig.get(setting.key) - setting.min) / (double) span;
+    }
+
     private ITextComponent label(Settings.Setting setting) {
-        int value = VulkanConfig.get(setting.key);
+        return label(setting, VulkanConfig.get(setting.key));
+    }
+
+    private ITextComponent label(Settings.Setting setting, int value) {
         String shown = setting.bool ? (value != 0 ? "on" : "off") : Integer.toString(value);
         String colour = setting.live ? TextFormatting.WHITE.toString()
                 : TextFormatting.DARK_GRAY.toString();
@@ -158,6 +231,22 @@ public class SettingsScreen extends Screen {
                                     + ", scroll to see the rest"),
                     this.width / 2, this.height - 42, 0x808080);
         }
+        if (category == null) {
+            if (lastPreset != null) {
+                drawCenteredString(matrices, this.font, new StringTextComponent(
+                                TextFormatting.GREEN + lastPreset + " applied"),
+                        this.width / 2, 58 + 4 * ROW_HEIGHT + 6, 0xFFFFFF);
+            }
+            Presets.Preset over = hoveredPreset(mouseX, mouseY);
+            if (over != null) {
+                List<ITextComponent> lines = new java.util.ArrayList<>();
+                for (String line : wrap(over.description, 60)) {
+                    lines.add(new StringTextComponent(line));
+                }
+                renderComponentTooltip(matrices, lines, mouseX, mouseY);
+            }
+            return;
+        }
         // The description of whatever the pointer is over, wrapped by hand
         // because there is more of it than fits.
         Settings.Setting hovered = hovered(mouseY);
@@ -172,6 +261,19 @@ public class SettingsScreen extends Screen {
             }
             renderComponentTooltip(matrices, lines, mouseX, mouseY);
         }
+    }
+
+    private Presets.Preset hoveredPreset(int mouseX, int mouseY) {
+        int left = this.width / 2 - 150;
+        int half = (300 - 4) / 2;
+        int row = (mouseY - 58) / ROW_HEIGHT;
+        if (mouseY < 58 || (mouseY - 58) % ROW_HEIGHT > 20 || mouseX < left
+                || mouseX >= left + 300) {
+            return null;
+        }
+        int column = mouseX < left + half ? 0 : mouseX >= left + half + 4 ? 1 : -1;
+        int index = row * 2 + column;
+        return column >= 0 && index < Presets.ALL.length ? Presets.ALL[index] : null;
     }
 
     private Settings.Setting hovered(int mouseY) {
