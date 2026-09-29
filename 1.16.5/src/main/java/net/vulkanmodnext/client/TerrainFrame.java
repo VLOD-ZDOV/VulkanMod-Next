@@ -417,6 +417,39 @@ public final class TerrainFrame {
 
     }
 
+    /**
+     * The glow, the ambient occlusion and the tone, over the finished world.
+     *
+     * The order is the 1.12.2 one and it is a rule of this frame rather than
+     * of optics: bloom decides what is covered by comparing the frame against
+     * a copy of the terrain taken earlier, so darkening the frame first makes
+     * the two disagree everywhere and puts the glow out entirely. The tone is
+     * of the finished picture, and by then the glow is part of it.
+     */
+    public static void applySceneEffects() {
+        VkContext context = VulkanStartup.context();
+        if (context == null || !VulkanConfig.isTerrainEnabled()) {
+            return;
+        }
+        int frame = Minecraft.getInstance().getMainRenderTarget().getColorTextureId();
+        if (frame <= 0) {
+            return;
+        }
+        try {
+            context.applySceneBloom(frame);
+            context.applySceneOcclusion(frame);
+            context.applySceneTone(frame);
+        } catch (Throwable failed) {
+            if (!sceneFailureAnnounced) {
+                sceneFailureAnnounced = true;
+                VulkanModNext.LOGGER.warn("The scene effects failed; the frame goes out "
+                        + "without them", failed);
+            }
+        }
+    }
+
+    private static boolean sceneFailureAnnounced;
+
     /** The block atlas, by its OpenGL name. */
     public static int atlasTexture() {
         return Minecraft.getInstance().getTextureManager()
