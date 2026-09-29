@@ -300,6 +300,9 @@ public final class VulkanConfig {
         if ("materialTags".equals(setting.key) && before != get(setting.key)) {
             rebuildWorld("material tags");
         }
+        if ("smartAnimations".equals(setting.key) && before == 0 && get(setting.key) != 0) {
+            rebuildWorld("smart animations");
+        }
         if ("extremeRenderDistance".equals(setting.key) && before != get(setting.key)) {
             RenderDistanceLimit.apply();
         }
@@ -319,6 +322,7 @@ public final class VulkanConfig {
      */
     public static void setAll(Map<String, Integer> values) {
         int tagsBefore = get("materialTags");
+        int smartBefore = get("smartAnimations");
         int extremeBefore = get("extremeRenderDistance");
         for (Map.Entry<String, Integer> entry : values.entrySet()) {
             Settings.Setting setting = find(entry.getKey());
@@ -334,6 +338,8 @@ public final class VulkanConfig {
         }
         if (tagsBefore != get("materialTags")) {
             rebuildWorld("material tags");
+        } else if (smartBefore == 0 && on("smartAnimations")) {
+            rebuildWorld("smart animations");
         }
         if (extremeBefore != get("extremeRenderDistance")) {
             RenderDistanceLimit.apply();
@@ -342,12 +348,18 @@ public final class VulkanConfig {
 
     public static void reset() {
         int tagsBefore = get("materialTags");
+        int smartBefore = get("smartAnimations");
         int extremeBefore = get("extremeRenderDistance");
         for (Settings.Setting setting : Settings.all()) {
             VALUES.put(setting.key, setting.fallback);
         }
+        // Smart animations only when switched on: a chunk built without its
+        // record steps everything, so switching off needs nothing rebuilt, and
+        // switching on saves nothing until the sections in view are rebuilt.
         if (tagsBefore != get("materialTags")) {
             rebuildWorld("material tags");
+        } else if (smartBefore == 0 && on("smartAnimations")) {
+            rebuildWorld("smart animations");
         }
         // Turning the switch off has to take the slider, and a distance past
         // its new end, back with it — see RenderDistanceLimit.

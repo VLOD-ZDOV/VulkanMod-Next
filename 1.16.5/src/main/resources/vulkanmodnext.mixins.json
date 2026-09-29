@@ -43,7 +43,9 @@
     "BuildNearOffThreadMixin",
     "BuildNearTimingMixin",
     "EntitySectionsMixin",
-    "ChunkPreloadMixin"
+    "ChunkPreloadMixin",
+    "CompiledChunkSpritesMixin",
+    "ItemSpriteMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }

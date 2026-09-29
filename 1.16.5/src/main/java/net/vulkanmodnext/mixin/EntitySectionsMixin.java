@@ -3,6 +3,7 @@ package net.vulkanmodnext.mixin;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectListIterator;
 import net.minecraft.client.renderer.WorldRenderer;
+import net.vulkanmodnext.client.AnimatedSprites;
 import net.vulkanmodnext.client.CpuSavings;
 import net.vulkanmodnext.client.ShortSections;
 import org.spongepowered.asm.mixin.Mixin;
@@ -39,6 +40,14 @@ public abstract class EntitySectionsMixin {
                             + "Lit/unimi/dsi/fastutil/objects/ObjectListIterator;"))
     @SuppressWarnings({"rawtypes", "unchecked"})
     private ObjectListIterator vulkanmodnext$blockEntitySections(ObjectList visible) {
+        // Smart animations gather their visible set here too, for the same
+        // reason this pass is shortened here: it is the one walk of the visible
+        // list that happens every frame after the frame's uploads, whether the
+        // terrain goes to Vulkan or not. Sections holding nothing use no
+        // sprite, so the shortened list is the whole answer.
+        if (CpuSavings.smartAnimations) {
+            AnimatedSprites.markVisible(ShortSections.of(visible));
+        }
         if (!CpuSavings.shortEntitySections) {
             CpuSavings.countBlockEntityWalk(visible.size());
             return visible.iterator();
