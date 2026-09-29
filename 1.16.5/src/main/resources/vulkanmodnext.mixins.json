@@ -32,7 +32,8 @@
     "ExplosionParticleMixin",
     "NearPlaneMixin",
     "ChunkBuildThreadsMixin",
-    "ChunkBuilderExecutorMixin"
+    "ChunkBuilderExecutorMixin",
+    "AnimatedTexturesMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }
