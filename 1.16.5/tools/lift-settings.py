@@ -47,13 +47,10 @@ LIVE = {
     "atlasPixelsSeen",
 }
 
-# Defaults that differ here, each with the reason. On 1.12.2 the terrain switch
-# is on, because the terrain draw there is finished and measured. Here it is the
-# newest thing in the port and has never been shown to draw a correct frame, so
-# it starts off: a mod that replaces the world's rendering by default, before
-# anybody has seen it work, is a mod that gets uninstalled.
+# Defaults that differ here, each with the reason. The terrain switch used to
+# start off, while the port had never been shown to draw a correct frame; it has
+# been since, and it now starts on as it does on 1.12.2.
 OVERRIDE_DEFAULT = {
-    "terrainEnabled": "false",
 }
 
 # Settings the port has wired up and can steer. Everything else is remembered
