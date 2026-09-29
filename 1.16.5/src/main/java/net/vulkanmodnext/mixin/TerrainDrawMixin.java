@@ -7,6 +7,7 @@ import net.minecraft.client.renderer.ActiveRenderInfo;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.util.math.vector.Matrix4f;
+import net.vulkanmodnext.client.CpuSavings;
 import net.vulkanmodnext.client.TerrainFrame;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -47,6 +48,7 @@ public abstract class TerrainDrawMixin {
                                     GameRenderer renderer, LightTexture lightmap,
                                     Matrix4f projection, CallbackInfo ci) {
         TerrainFrame.beginFrame(projection);
+        CpuSavings.beginFrame();
     }
 
     /**
