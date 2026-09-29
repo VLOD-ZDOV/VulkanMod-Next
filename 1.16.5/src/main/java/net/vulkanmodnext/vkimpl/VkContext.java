@@ -1023,6 +1023,17 @@ public final class VkContext {
         }
     }
 
+    /**
+     * The carried and nearby light sources for the coming frame, four floats
+     * each: position relative to the camera, then level. Copied by the
+     * renderer, so the caller may refill the array straight away.
+     */
+    public synchronized void updateDynamicLights(float[] lights, int count) {
+        if (initialized && interopCapable) {
+            terrainRenderer().setDynamicLights(lights, count);
+        }
+    }
+
     public synchronized void updateCameraOffset(float[] offset) {
         if (initialized && interopCapable) {
             terrainRenderer().setCameraOffset(offset);

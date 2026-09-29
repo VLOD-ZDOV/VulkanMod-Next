@@ -149,7 +149,7 @@ public final class TerrainFrame {
             return false;
         }
 
-        handOverFrameState(context, matrices);
+        handOverFrameState(context, matrices, viewX, viewY, viewZ);
         boolean drawn = context.renderTerrainLayer(ordinal, slots, count, mvp,
                 viewX, viewY, viewZ,
                 Minecraft.getInstance().getWindow().getWidth(),
@@ -180,7 +180,8 @@ public final class TerrainFrame {
      * what keeps our fog and the game's from disagreeing at the seam where our
      * terrain meets vanilla's entities.
      */
-    private static void handOverFrameState(VkContext context, MatrixStack matrices) {
+    private static void handOverFrameState(VkContext context, MatrixStack matrices,
+                                           double viewX, double viewY, double viewZ) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level != null) {
             float angle = mc.level.getTimeOfDay(mc.getFrameTime()) * ((float) Math.PI * 2.0f);
@@ -218,6 +219,11 @@ public final class TerrainFrame {
         cameraOffset[2] = -(into.get(8) * into.get(12) + into.get(9) * into.get(13)
                 + into.get(10) * into.get(14));
         context.updateCameraOffset(cameraOffset);
+
+        // Once a frame, not once a layer: see DynamicLights.gatheredFrame. The
+        // camera handed to the layer is the one the shader's positions are
+        // relative to, so the sources are gathered against exactly that.
+        DynamicLights.handOver(context, frames, viewX, viewY, viewZ);
     }
 
     /**

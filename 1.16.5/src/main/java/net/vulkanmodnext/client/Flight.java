@@ -739,6 +739,8 @@ public final class Flight {
         // because it drew a different number of chunks.
         VulkanModNext.LOGGER.info("Flight {} {}: {}", TAG, why, TerrainFrame.layerReport());
         VulkanModNext.LOGGER.info("Flight {} {}", TAG, MaterialRuns.stats());
+        VulkanModNext.LOGGER.info("Flight {} {}", TAG, DynamicLights.stats());
+        VulkanModNext.LOGGER.info("Flight {} {}", TAG, BlockLightSources.stats());
         net.vulkanmodnext.vkimpl.VkContext context = VulkanStartup.context();
         if (context != null) {
             VulkanModNext.LOGGER.info("Flight {} terrain:\n{}", TAG, context.terrainDiagnostics());
