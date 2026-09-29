@@ -3035,7 +3035,17 @@ final class VkTerrainRenderer {
             if (drawCount != 0) {
                 vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
                         0, stack.longs(drawDescriptorSets[batchIndex]), null);
-                if (ctx.canMultiDrawIndirect()) {
+                if (!ctx.canDrawIndirectFirstInstance()) {
+                    // The same five numbers as direct calls, where a first
+                    // instance is always allowed. See the 1.12.2 twin.
+                    long base = drawBatchMapped[batchIndex] + drawCommandOffset;
+                    for (int i = 0; i < drawCount; i++) {
+                        long c = base + (long) i * DRAW_COMMAND_BYTES;
+                        vkCmdDrawIndexed(commandBuffer, MemoryUtil.memGetInt(c),
+                                MemoryUtil.memGetInt(c + 4), MemoryUtil.memGetInt(c + 8),
+                                MemoryUtil.memGetInt(c + 12), MemoryUtil.memGetInt(c + 16));
+                    }
+                } else if (ctx.canMultiDrawIndirect()) {
                     vkCmdDrawIndexedIndirect(commandBuffer, drawBatchBuffers[batchIndex],
                             drawCommandOffset, drawCount, DRAW_COMMAND_BYTES);
                 } else {
