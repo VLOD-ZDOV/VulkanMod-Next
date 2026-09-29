@@ -2,13 +2,20 @@
 
 ## [Unreleased]
 
+## [0.10.0-alpha.7]
+
+The first alpha with a 1.16.5 build attached. The 1.12.2 build is unchanged
+from alpha.6.
+
 ### 1.16.5 port
 
 The 1.16.5 build catches up: from 43 of the 1.12.2 build's 106 settings doing
-something to 72. Every one marked working was turned to both ends in the same
+something to 85. Every one marked working was turned to both ends in the same
 flight and the two frames compared; the ones that could not be shown that way
 are still marked "not yet ported" in the menu.
 
+- **Changed: the Vulkan terrain is now on by default**, as on 1.12.2. It was
+  off while the port had never been shown to draw a correct frame.
 - **Added: presets.** Stable, Balanced, Performance, Potato, Beautiful, Golden
   Hour, Cold Front and Soft Film, with the same values as on 1.12.2, on a tab of
   their own. Number settings are sliders now instead of a hundred clicks.
@@ -20,10 +27,18 @@ are still marked "not yet ported" in the menu.
 - **Fixed: water, lava, fire and every other animated block stood still when
   drawn through Vulkan.** The animation frames never reached the renderer's copy
   of the block atlas.
+- **Added: creatures, particles and rain and snow drawn through Vulkan**, as on
+  1.12.2. Anything the renderer cannot take — glinting armour, glowing outlines,
+  modded particle types, a refused batch — is left to the game rather than lost.
+- **Added: the CPU savings from 1.12.2 that apply here:** the far-corner frustum
+  test, near chunks built off the render thread, short section lists for the
+  terrain layers and block entities, off-screen chunk preloading and smart
+  animations. Two of 1.12.2's do not apply to this version's engine and say so
+  in the menu.
+- **Fixed: the directional light setting never reached the shader.**
 - **Added:** dynamic lights (held and dropped light sources, burning mobs),
   fog switch and fog distance, time and weather control, round sun and moon with
-  size and warmth,
-  cloud tint, frame graph, diagnostics file, render distance up to 128, chunk
+  size and warmth, cloud tint, frame graph, diagnostics file, render distance up to 128, chunk
   build threads, animated textures switch, vanilla buffer drop, and handing
   water and glass back to the game.
 - **Ported but not yet shown working, so still greyed in the menu:** zoom,
