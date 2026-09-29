@@ -5,6 +5,7 @@ import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.vertex.VertexBuffer;
 import net.vulkanmodnext.client.ChunkLayers;
 import net.vulkanmodnext.client.ChunkMirror;
+import net.vulkanmodnext.client.TerrainFrame;
 import net.vulkanmodnext.client.VertexBufferSlot;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -42,6 +43,18 @@ public abstract class VertexBufferUploadMixin implements VertexBufferSlot {
             // Neither position nor limit is touched by the mirror, so the
             // upload on the next line still sees exactly what it expects.
             ChunkMirror.onBufferData(vulkanmodnext$slotOrAssign(), data);
+            if (TerrainFrame.dropVanillaBuffers()) {
+                // Vulkan has its copy; the game's would only be paid for and
+                // never drawn. Handing back an empty view rather than skipping
+                // the upload keeps vanilla's own arithmetic honest: the vertex
+                // count it works out from this is zero, so any vanilla draw
+                // that slips through draws nothing instead of reading past the
+                // end of a buffer that was never filled. The builder's cursor
+                // has already moved, which popNextBuffer did above.
+                ByteBuffer empty = data.duplicate();
+                empty.limit(empty.position());
+                return Pair.of(popped.getFirst(), empty);
+            }
         }
         return popped;
     }

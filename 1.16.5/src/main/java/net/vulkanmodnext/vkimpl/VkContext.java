@@ -909,6 +909,12 @@ public final class VkContext {
         }
     }
 
+    /** Whether the translucent layer is drawn here; see TerrainFrame's buffer drop. */
+    public synchronized boolean drawsTranslucent() {
+        return initialized && interopCapable && terrainRenderer != null
+                && terrainRenderer.drawsTranslucent();
+    }
+
     public synchronized void setMaterialSprites(int[] materials, float[] rects, int count) {
         if (!initialized) {
             return;

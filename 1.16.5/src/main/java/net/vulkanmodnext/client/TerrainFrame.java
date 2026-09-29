@@ -82,6 +82,7 @@ public final class TerrainFrame {
         try {
             return gather(context, renderer, layer, matrices, viewX, viewY, viewZ);
         } catch (Throwable failed) {
+            markBroken("threw while drawing a layer");
             if (!announced) {
                 announced = true;
                 VulkanModNext.LOGGER.warn("Could not draw a terrain layer through Vulkan; the "
@@ -156,6 +157,9 @@ public final class TerrainFrame {
                 Minecraft.getInstance().getWindow().getHeight());
         taken[ordinal] += drawn ? 1 : 0;
         refused[ordinal] += drawn ? 0 : 1;
+        if (!drawn && droppingVanillaBuffers) {
+            markBroken("declined a layer");
+        }
         return drawn;
     }
 
@@ -360,6 +364,74 @@ public final class TerrainFrame {
     public static void beginFrame(Matrix4f projection) {
         frameProjection = projection;
         frames++;
+        updateVanillaBufferDrop();
+    }
+
+    /**
+     * Whether the game's own chunk upload is being emptied right now.
+     *
+     * Read by the upload hook on every chunk, so it is a field settled once a
+     * frame rather than a chain of checks.
+     */
+    private static volatile boolean droppingVanillaBuffers;
+
+    /**
+     * Set when a layer the renderer was asked for came back undrawn or threw.
+     * Sticky for the session: a renderer that failed once is not trusted with
+     * the only copy of the world again.
+     */
+    private static boolean broken;
+
+    public static boolean dropVanillaBuffers() {
+        return droppingVanillaBuffers;
+    }
+
+    /**
+     * Turns the drop on and off, and rebuilds the world whenever it changes.
+     *
+     * This is the whole safety of the feature. Every failure path in this mod
+     * ends in the game drawing the layer itself, which works only because the
+     * game's buffers hold the world; with them empty it would be an invisible
+     * one. So the moment anything makes the Vulkan path unavailable — a
+     * failure, the setting, the terrain switch — the buffers have to be filled
+     * again, and the only way to do that is to rebuild every chunk.
+     */
+    private static void updateVanillaBufferDrop() {
+        VkContext context = VulkanStartup.context();
+        boolean want = VulkanConfig.on("dropVanillaBuffers")
+                && !broken
+                && VulkanConfig.isTerrainEnabled()
+                && context != null
+                // Water and glass live in the game's buffers and nowhere else
+                // until the translucent layer goes through Vulkan. Dropping
+                // them before that leaves the layer to a renderer that declines
+                // it and to buffers that are empty, and an ocean turns into a
+                // hole in the world with nothing in any log to say so.
+                && context.drawsTranslucent();
+        if (want == droppingVanillaBuffers) {
+            return;
+        }
+        droppingVanillaBuffers = want;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.levelRenderer != null && mc.level != null) {
+            VulkanModNext.LOGGER.info("Vanilla chunk buffers {} — rebuilding every chunk so the "
+                    + "world stays drawn", want ? "no longer filled" : "filled again");
+            mc.levelRenderer.allChanged();
+        }
+    }
+
+    private static void markBroken(String why) {
+        if (broken) {
+            return;
+        }
+        broken = true;
+        if (droppingVanillaBuffers) {
+            VulkanModNext.LOGGER.warn("The Vulkan terrain {}; filling the game's own chunk "
+                    + "buffers again", why);
+            // Settled now rather than at the top of the next frame, so that
+            // this frame's remaining layers are the only ones drawn empty.
+            updateVanillaBufferDrop();
+        }
     }
 
     /**
