@@ -130,10 +130,25 @@ public final class VulkanContextImpl implements VulkanBridge {
     private VkTerrainRenderer terrainRenderer;
     private boolean interopCapable;
     private boolean multiDrawIndirect;
+    private boolean drawIndirectFirstInstance;
 
     /** Whether one indirect draw may carry more than one command. */
     public boolean canMultiDrawIndirect() {
         return multiDrawIndirect;
+    }
+
+    /**
+     * Whether an indirect command may carry a first instance other than zero.
+     *
+     * Every terrain command does: the shader finds a chunk's corner through
+     * gl_InstanceIndex, and the first instance is how each command names its
+     * chunk. Without this feature the specification requires that field to be
+     * zero, and the value lives in a buffer, where the validation layer cannot
+     * see it — so a driver that honours the rule literally would have drawn
+     * every chunk at the origin with nothing anywhere saying why.
+     */
+    public boolean canDrawIndirectFirstInstance() {
+        return drawIndirectFirstInstance;
     }
 
     @Override
@@ -771,13 +786,23 @@ public final class VulkanContextImpl implements VulkanBridge {
             VkPhysicalDeviceFeatures available = VkPhysicalDeviceFeatures.malloc(stack);
             vkGetPhysicalDeviceFeatures(physicalDevice, available);
             this.multiDrawIndirect = available.multiDrawIndirect();
+            // -Dvulkanmodnext.noIndirectFirstInstance=true takes the fallback on
+            // a card that does not need it — the only way that path ever runs
+            // on the machines this is developed on.
+            this.drawIndirectFirstInstance = available.drawIndirectFirstInstance()
+                    && !Boolean.getBoolean("vulkanmodnext.noIndirectFirstInstance");
+            if (!drawIndirectFirstInstance) {
+                LOGGER.warn("This driver will not take a first instance in an indirect draw; "
+                        + "terrain chunks will be drawn with direct calls instead");
+            }
             if (!multiDrawIndirect) {
                 LOGGER.warn("This driver cannot draw more than one indirect command at a time; "
                         + "terrain chunks will be drawn one command each");
             }
             VkPhysicalDeviceFeatures features = VkPhysicalDeviceFeatures.calloc(stack)
                     .robustBufferAccess(true)
-                    .multiDrawIndirect(multiDrawIndirect);
+                    .multiDrawIndirect(multiDrawIndirect)
+                    .drawIndirectFirstInstance(drawIndirectFirstInstance);
 
             VkDeviceCreateInfo deviceInfo = VkDeviceCreateInfo.calloc(stack)
                     .sType(VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO)
@@ -1061,6 +1086,8 @@ public final class VulkanContextImpl implements VulkanBridge {
         sb.append('\n');
         cap(sb, "multi-draw indirect", multiDrawIndirect,
                 "one call per chunk instead of one per layer");
+        cap(sb, "indirect first instance", drawIndirectFirstInstance,
+                "direct draw calls, one per chunk");
     }
 
     /** One line of the table above: what it is, whether it was granted, and what happens if not. */
