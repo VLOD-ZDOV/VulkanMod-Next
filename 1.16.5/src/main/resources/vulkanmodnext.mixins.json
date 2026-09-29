@@ -28,7 +28,8 @@
     "WeatherDisplayMixin",
     "WorldTimeDisplayMixin",
     "EntityRenderDistanceMixin",
-    "TileEntityRenderDistanceMixin"
+    "TileEntityRenderDistanceMixin",
+    "ExplosionParticleMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }
