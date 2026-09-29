@@ -317,11 +317,27 @@ final class VkRayTracing {
         if (geometryAddress == 0) {
             return;
         }
+        long geometryEnd = mirror.geometryCapacity();
 
         for (int c = 0; c < chunkCount && live.size() < maxStructures; c++) {
             VkChunkMirror.Entry entry = entries[c];
             int chunkStride = VertexLayout.stride();
             if (entry == null || entry.size < chunkStride || entry.size % chunkStride != 0) {
+                continue;
+            }
+            // Inside the buffer, or not built at all. A draw past the end is
+            // caught by robust buffer access; a structure build is not, it
+            // reads what is there and faults the card. The mirror's own
+            // allocator has been seen with its mark past the buffer at least
+            // once, cause still unknown, so this is the line that keeps that
+            // from becoming a device loss — and says so the first time.
+            if (entry.offset < 0 || entry.offset + entry.size > geometryEnd) {
+                if (!outOfBoundsWarned) {
+                    outOfBoundsWarned = true;
+                    LOGGER.error("A chunk's geometry lies outside the geometry buffer "
+                            + "(offset {}, size {}, buffer {}); not building its structure",
+                            entry.offset, entry.size, geometryEnd);
+                }
                 continue;
             }
             double dx = chunks[c * 4 + 1] - viewX;
@@ -1208,6 +1224,9 @@ final class VkRayTracing {
         instanceCapacity = 0;
         instanceAddress = 0;
     }
+
+    /** Said once, because it repeats every frame for as long as the entry stays. */
+    private boolean outOfBoundsWarned;
 
     void destroy() {
         if (!ready) {
