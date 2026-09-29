@@ -11014,9 +11014,19 @@ final class VkTerrainRenderer {
             GL11C.glDeleteTextures(glDepthTexture);
             EXTMemoryObject.glDeleteMemoryObjectsEXT(glColorMemoryObject);
             EXTMemoryObject.glDeleteMemoryObjectsEXT(glDepthMemoryObject);
-            if (glTranslucentTexture != -1) {
+            boolean hadTranslucent = glTranslucentTexture != -1;
+            if (hadTranslucent) {
                 GL11C.glDeleteTextures(glTranslucentTexture);
                 EXTMemoryObject.glDeleteMemoryObjectsEXT(glTranslucentMemoryObject);
+            }
+            // The Win32 handles these were imported from, closed now rather
+            // than at device teardown; see Interop.releaseMemoryHandle for why
+            // the glFinish has to come first. A resize is rare enough for it.
+            GL11C.glFinish();
+            Interop.releaseMemoryHandle(glColorMemoryObject);
+            Interop.releaseMemoryHandle(glDepthMemoryObject);
+            if (hadTranslucent) {
+                Interop.releaseMemoryHandle(glTranslucentMemoryObject);
             }
         }
         glTranslucentTexture = -1;
