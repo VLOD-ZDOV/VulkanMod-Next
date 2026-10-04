@@ -151,6 +151,7 @@ public final class SharedDepth {
 
     private static boolean attach(Framebuffer frame, int texture) {
         int previousFbo = GlStateManager.glGetInteger(FRAMEBUFFER_BINDING);
+        int previousRead = GlStateManager.glGetInteger(READ_FRAMEBUFFER_BINDING);
         try {
             while (org.lwjgl.opengl.GL11.glGetError() != 0) {
                 // Drained first, so a driver that fails halfway is not diagnosed
@@ -174,7 +175,7 @@ public final class SharedDepth {
             VulkanModNext.LOGGER.error("Could not hand the depth image to the game's frame", t);
             return false;
         } finally {
-            OpenGlHelper.glBindFramebuffer(OpenGlHelper.GL_FRAMEBUFFER, previousFbo);
+            putBack(previousFbo, previousRead);
         }
     }
 
@@ -183,6 +184,7 @@ public final class SharedDepth {
             return;
         }
         int previousFbo = GlStateManager.glGetInteger(FRAMEBUFFER_BINDING);
+        int previousRead = GlStateManager.glGetInteger(READ_FRAMEBUFFER_BINDING);
         try {
             OpenGlHelper.glBindFramebuffer(OpenGlHelper.GL_FRAMEBUFFER, frame.framebufferObject);
             OpenGlHelper.glFramebufferRenderbuffer(OpenGlHelper.GL_FRAMEBUFFER,
@@ -191,10 +193,25 @@ public final class SharedDepth {
         } catch (Throwable t) {
             VulkanModNext.LOGGER.error("Could not give the game's depth buffer back", t);
         } finally {
-            OpenGlHelper.glBindFramebuffer(OpenGlHelper.GL_FRAMEBUFFER, previousFbo);
+            putBack(previousFbo, previousRead);
             replacedRenderbuffer = 0;
             attached = false;
         }
+    }
+
+    /**
+     * Both bindings back, each to what it was.
+     *
+     * Binding {@code GL_FRAMEBUFFER} sets the draw and the read target at once,
+     * and the binding read back before was the draw one only — so a read
+     * target that differed came back as the draw one. The game binds the two
+     * together, but a mod that does not would have found its reads taken from
+     * the wrong frame, and this project has met that shape of bug before: one
+     * call that looked like one binding and was two.
+     */
+    private static void putBack(int draw, int read) {
+        org.lwjgl.opengl.GL30.glBindFramebuffer(org.lwjgl.opengl.GL30.GL_DRAW_FRAMEBUFFER, draw);
+        org.lwjgl.opengl.GL30.glBindFramebuffer(org.lwjgl.opengl.GL30.GL_READ_FRAMEBUFFER, read);
     }
 
     private static void remember(Framebuffer frame, int texture) {
@@ -213,4 +230,6 @@ public final class SharedDepth {
      * safe where calling directly would not be.
      */
     private static final int FRAMEBUFFER_BINDING = 36006;
+    /** {@code GL_READ_FRAMEBUFFER_BINDING}. */
+    private static final int READ_FRAMEBUFFER_BINDING = 36010;
 }
