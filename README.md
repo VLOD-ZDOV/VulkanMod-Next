@@ -12,14 +12,14 @@
 
 <p align="center">
   <b>1.12.2</b> is the build that works, and the one to install. Still being worked on.<br>
-  <b>1.16.5</b> lives in <code>1.16.5/</code> and is early: it draws the world, and little else yet.
+  <b>1.16.5</b> lives in <code>1.16.5/</code> and is in alpha: most of the 1.12.2 build is there, ray tracing cannot be.
 </p>
 
 <p align="center">
   <a href="https://www.curseforge.com/minecraft/mc-mods/vulkanmod-next"><img src="https://cf.way2muchnoise.eu/full_1624664_downloads.svg?badge_style=flat" alt="CurseForge"></a>
   <a href="https://github.com/VLOD-ZDOV/VulkanMod-Next/releases"><img src="https://img.shields.io/github/downloads/VLOD-ZDOV/VulkanMod-Next/total?style=flat&logo=github&label=GitHub" alt="GitHub downloads"></a>
   <img src="https://img.shields.io/badge/Minecraft-1.12.2-brightgreen?style=flat" alt="Minecraft 1.12.2">
-  <img src="https://img.shields.io/badge/Minecraft-1.16.5%20(early)-yellow?style=flat" alt="Minecraft 1.16.5, early">
+  <img src="https://img.shields.io/badge/Minecraft-1.16.5%20(alpha)-yellow?style=flat" alt="Minecraft 1.16.5, alpha">
   <img src="https://img.shields.io/badge/licence-LGPL--3.0-blue?style=flat" alt="LGPL-3.0">
 </p>
 
@@ -205,27 +205,41 @@ Going further is optional: turn on **Ultra Logging** and send
 | [ROADMAP.md](ROADMAP.md) | what is [done](ROADMAP.md#done), [planned](ROADMAP.md#planned) and [not planned](ROADMAP.md#not-planned) |
 | [CHANGELOG.md](CHANGELOG.md) | every release, in detail |
 | [ADVANCED.md](ADVANCED.md) | the full feature list, the JVM switches, building, diagnostics |
-| [1.16.5/](1.16.5) | the port to 1.16.5 — early, see below |
+| [1.16.5/](1.16.5) | the port to 1.16.5 — alpha, see below |
 | [Issues](https://github.com/VLOD-ZDOV/VulkanMod-Next/issues) | bugs and requests |
 
 ---
 
 ## The 1.16.5 build
 
-It exists, it is in this repository under `1.16.5/`, and it is **not worth installing yet**.
-What it does today: Vulkan comes up on the same card OpenGL is on, chunk geometry is mirrored
-into it, and the world's terrain is drawn by Vulkan and composited back into the game's frame.
-Measured against vanilla on the same world it produces the same picture — 427 distinct colours
-against 428, the same commonest colour covering the same share of the screen.
+In this repository under `1.16.5/`, and attached to the
+[releases](https://github.com/VLOD-ZDOV/VulkanMod-Next/releases) from 0.10.0-alpha.7 as
+`vulkanmodnext-1.16.5-<version>.jar`. It needs Forge 36 and nothing else — no MixinBooter, and
+the Vulkan bindings the game does not ship are inside the jar.
 
-What it does not do: any of the effects. The settings screen lists all 106 of them and says
-plainly how many actually steer anything, which at the time of writing is 19. The terrain
-switch ships **off**, because a renderer that takes over the world by default before anybody
-has seen it work is a renderer that gets uninstalled.
+It is an alpha, and a younger one than the 1.12.2 build. What it does:
 
-Two things about it are already better than the 1.12.2 build, and both come from the version
-rather than from us: the game is on LWJGL 3 already, so the whole two-class-loader construction
-is gone, and a 1.16.5 vertex carries its own normal.
+- the terrain, water, creatures, particles, rain and snow are drawn by Vulkan, on by default;
+- the effects and presets of the 1.12.2 build, with the same names and the same values;
+- the 1.12.2 build's settings for the game itself — fog, time and weather, zoom, frame graph,
+  render distance past 32, chunk build threads — and the CPU savings that apply to this
+  version's engine.
+
+The settings screen says, setting by setting, which ones act on this version. 85 of the
+1.12.2 build's 106 do; each was shown working by turning it to both ends on the same route and
+comparing the two frames, and the ones that could not be shown that way are greyed and say so.
+
+What it cannot do: **ray tracing**, nor the settings built on it. The Vulkan bindings this
+version of the game ships are older than ray tracing in Vulkan, and they are the ones the game
+loads. The menu says "not on 1.16.5" rather than "not yet".
+
+What is worse than on 1.12.2: a mod whose patches collide with this one's stops the game at
+startup. The 1.12.2 build switches the colliding part off and carries on; this one does not
+yet. If that happens to you, the log names the patch — please report it.
+
+Two things about it are better than the 1.12.2 build, and both come from the version rather
+than from us: the game is on LWJGL 3 already, so the whole two-class-loader construction is
+gone, and a 1.16.5 vertex carries its own normal.
 
 ---
 

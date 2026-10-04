@@ -8,6 +8,37 @@ rather than crashing.
 
 ## Done
 
+### 0.10.0-alpha.7
+
+- **A 1.16.5 build, attached to the release.** 85 of the 1.12.2 build's 106 settings act on it:
+  terrain, water, creatures, particles and weather through Vulkan, the effects and presets, and
+  the game-side settings. Ray tracing cannot work on that version and the menu says so.
+
+### 0.10.0-alpha.6
+
+- **Fixes from five reviewers reading the synchronization, the handover between the two APIs,
+  the chunk copies and the settings.** A black-world bug back in one line, two ways the two
+  halves of a frame could fall out of step, and geometry freed while the water pass still read it.
+
+### 0.10.0-alpha.5
+
+- **No pale shadow beside grass and blocks; calmer water; traced shadows where they belong.**
+- **Phones get a playable game instead of a crash.**
+
+### 0.10.0-alpha.4
+
+- **Renamed to VulkanMod Next**, with jars that name the Minecraft they are for.
+- **A card out of memory costs render distance, not the session.**
+- **Colour vision correction, gamma, and three more looks beside Beautiful.**
+- **A leaf lets the sun through from behind it.**
+
+### 0.10.0-alpha.3
+
+- **A chunk's faces are sorted by which way they point**, so the ones facing away from the
+  camera are never fetched; with the vertex packing, both on by default.
+- **The list of chunks to draw is kept between frames.**
+- **Rain no longer falls through twenty blocks of rock.**
+
 ### 0.10.0-alpha.2
 
 - **The two passes that draw creatures and chests walk a short list.** `renderEntities` reads
@@ -221,12 +252,19 @@ In the order they are likely to be worth doing.
   little left to give; what the frame is actually waiting on is the game, and that is where the
   next measurement goes.
 - **Connected glass textures.**
-- **Front-to-back drawing** within a terrain layer.
+- **The 1.16.5 build switching off a patch that collides with another mod** instead of stopping
+  at startup, the way the 1.12.2 build already does.
+- **The rest of the 1.16.5 settings that are ported but not yet shown working** — zoom, the
+  background frame cap, entity distances, the explosion particle budget, the near plane.
 - **Intel graphics.** Nobody has reported either way. The class of fault that catches an Intel
   driver where AMD and NVIDIA forgive it has been audited for and is not present, which is not
   the same as having run it.
 
 ## Not planned
+
+- **Front-to-back drawing within a terrain layer.** Measured: the terrain pass is held up by its
+  vertices, not its pixels, and a fragment that sorting would have rejected early was never the
+  cost. Sorting buys nothing here.
 
 - **Ray-traced reflections and global illumination.** Shadows shipped in 0.8.0; these do not
   follow from them. A chunk's acceleration structure has to be rebuilt whenever the chunk is,
