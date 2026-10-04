@@ -208,6 +208,12 @@ public final class SharedDepth {
      * together, but a mod that does not would have found its reads taken from
      * the wrong frame, and this project has met that shape of bug before: one
      * call that looked like one binding and was two.
+     *
+     * Through {@code GL30} directly rather than {@code OpenGlHelper}, which the
+     * note on {@link #FRAMEBUFFER_BINDING} warns against: the helper has no
+     * spelling for the separate targets. Safe here because nothing reaches
+     * this class without the interop path, and that path needs OpenGL 3.0 —
+     * the EXT-only route where the direct call would fail never gets this far.
      */
     private static void putBack(int draw, int read) {
         org.lwjgl.opengl.GL30.glBindFramebuffer(org.lwjgl.opengl.GL30.GL_DRAW_FRAMEBUFFER, draw);
