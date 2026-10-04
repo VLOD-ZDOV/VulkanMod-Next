@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+Fixes from an outside review of the whole code base. Each claim in it was
+checked against the code before anything was changed; four held up.
+
+- **Fixed (Windows): the water and glass pass drew into images that belonged
+  to OpenGL at that moment.** On Windows the shared images are handed between
+  the two APIs explicitly, and the second pass of each frame never took them
+  back or gave its own result over. Other drivers forgive that; the rules do not.
+  Checked here with the same handover forced on and the validation layer
+  watching. Not yet tried on Windows — report against it. Both builds.
+- **Fixed (1.16.5): a terrain layer's OpenGL state stayed on after Vulkan drew
+  it.** Blending, the light map and smooth shading carried over into whatever
+  the game drew next.
+- **Fixed: the list of animated textures was rebuilt in place while chunks
+  were being built from it**, after a resource reload. Now built aside and
+  swapped in whole.
+- **Fixed: the shared depth option put back the game's read framebuffer as the
+  draw one.** The option is off by default.
+
 ## [0.10.0-alpha.7]
 
 The first alpha with a 1.16.5 build attached. The 1.12.2 build is unchanged
