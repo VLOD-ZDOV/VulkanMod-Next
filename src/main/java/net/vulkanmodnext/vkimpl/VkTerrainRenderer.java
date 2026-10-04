@@ -1376,7 +1376,12 @@ final class VkTerrainRenderer {
                     .srcAccessMask(release ? VK_ACCESS_SHADER_READ_BIT
                             | (i == 1 ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
                                       : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT) : 0)
-                    .dstAccessMask(release ? 0 : VK_ACCESS_SHADER_READ_BIT)
+                    // On the way in, the depth is loaded and written as an
+                    // attachment as well as sampled, and both have to be inside
+                    // the acquire's scope.
+                    .dstAccessMask(release ? 0 : VK_ACCESS_SHADER_READ_BIT
+                            | (i == 1 ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+                                      | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : 0))
                     .oldLayout(i == 1 ? depthLayout : sharedLayout())
                     .newLayout(i == 1 ? depthLayout : sharedLayout())
                     .srcQueueFamilyIndex(release ? owner : external)
