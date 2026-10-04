@@ -72,7 +72,7 @@ public final class AnimatedSprites {
     /** The animated sprites of the block atlas, in the order the atlas holds them. */
     private static TextureAtlasSprite[] sprites = new TextureAtlasSprite[0];
     private static List<TextureAtlasSprite> indexedFrom;
-    private static Map<TextureAtlasSprite, Integer> position = new IdentityHashMap<>();
+    private static volatile Map<TextureAtlasSprite, Integer> position = new IdentityHashMap<>();
     private static int words;
 
     /** Stepped whatever is on screen: water, lava, fire and portals, by name. */

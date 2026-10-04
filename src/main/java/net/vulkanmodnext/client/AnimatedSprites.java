@@ -65,7 +65,7 @@ public final class AnimatedSprites {
     private static TextureAtlasSprite[] sprites = new TextureAtlasSprite[0];
 
     /** Where each of them sits in that order. */
-    private static Map<TextureAtlasSprite, Integer> position = new IdentityHashMap<>();
+    private static volatile Map<TextureAtlasSprite, Integer> position = new IdentityHashMap<>();
 
     /** Words in each set. */
     private static int words;
@@ -180,10 +180,14 @@ public final class AnimatedSprites {
             return;
         }
         sprites = animated.toArray(new TextureAtlasSprite[0]);
-        position = new IdentityHashMap<>(sprites.length * 2);
+        // Filled first and published after: the chunk builder threads read
+        // this map without the lock, and the first version handed them the
+        // empty one and filled it under them.
+        Map<TextureAtlasSprite, Integer> at = new IdentityHashMap<>(sprites.length * 2);
         for (int i = 0; i < sprites.length; i++) {
-            position.put(sprites[i], i);
+            at.put(sprites[i], i);
         }
+        position = at;
         words = (sprites.length + BITS - 1) / BITS;
         always = new long[words];
         itemsNow = new long[words];
