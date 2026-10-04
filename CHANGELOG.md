@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.10.0-alpha.8]
+
 Fixes from an outside review of the whole code base. Each claim in it was
 checked against the code before anything was changed; four held up.
 
@@ -19,6 +21,8 @@ checked against the code before anything was changed; four held up.
   swapped in whole.
 - **Fixed: the shared depth option put back the game's read framebuffer as the
   draw one.** The option is off by default.
+
+Both builds are in this release, because both changed.
 
 ## [0.10.0-alpha.7]
 
