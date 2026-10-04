@@ -1336,21 +1336,49 @@ final class VkTerrainRenderer {
      * does not hold.
      */
     private void transferSharedImages(MemoryStack stack, VkCommandBuffer cmd, boolean release) {
+        transferSharedImages(stack, cmd, release, false);
+    }
+
+    /**
+     * The same, for the translucent pass as well.
+     *
+     * That pass runs after OpenGL has been handed the pair and before the next
+     * frame takes them back, so it has to take them itself and give them back
+     * when done — it loads the depth and reads the colour, and an exclusive
+     * image used by a queue that does not own it has undefined contents. Its
+     * own target goes to OpenGL with them: the composite reads it next. It is
+     * never taken back, because the pass clears it from an undefined layout
+     * and has no use for what was there.
+     */
+    private void transferSharedImages(MemoryStack stack, VkCommandBuffer cmd, boolean release,
+                                      boolean withTranslucent) {
         if (!EXTERNAL_QUEUE_TRANSFER || colorImage == 0 || depthImage == 0) {
             return;
         }
         int external = org.lwjgl.vulkan.VK11.VK_QUEUE_FAMILY_EXTERNAL;
         int owner = ctx.getGraphicsQueueFamily();
-        VkImageMemoryBarrier.Buffer barriers = VkImageMemoryBarrier.calloc(2, stack);
-        long[] images = {colorImage, depthImage};
-        int[] aspects = {VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_ASPECT_DEPTH_BIT};
-        for (int i = 0; i < 2; i++) {
+        boolean third = withTranslucent && release && translucentImage != 0;
+        int count = third ? 3 : 2;
+        // The depth comes back into the translucent pass in the layout the
+        // game's semaphore signal names for it, not the one the opaque pass
+        // left it in: OpenGL wrote the game's depth into it in between.
+        int depthLayout = withTranslucent && !release ? depthHandoffLayout() : sharedDepthLayout();
+        VkImageMemoryBarrier.Buffer barriers = VkImageMemoryBarrier.calloc(count, stack);
+        long[] images = {colorImage, depthImage, translucentImage};
+        int[] aspects = {VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_ASPECT_DEPTH_BIT,
+                VK_IMAGE_ASPECT_COLOR_BIT};
+        for (int i = 0; i < count; i++) {
             barriers.get(i)
                     .sType(VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER)
-                    .srcAccessMask(release ? VK_ACCESS_SHADER_READ_BIT : 0)
+                    // On the way out, the attachment writes as well as the
+                    // reads: both passes have just drawn into these, and what
+                    // OpenGL reads next is what they drew.
+                    .srcAccessMask(release ? VK_ACCESS_SHADER_READ_BIT
+                            | (i == 1 ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+                                      : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT) : 0)
                     .dstAccessMask(release ? 0 : VK_ACCESS_SHADER_READ_BIT)
-                    .oldLayout(i == 0 ? sharedLayout() : sharedDepthLayout())
-                    .newLayout(i == 0 ? sharedLayout() : sharedDepthLayout())
+                    .oldLayout(i == 1 ? depthLayout : sharedLayout())
+                    .newLayout(i == 1 ? depthLayout : sharedLayout())
                     .srcQueueFamilyIndex(release ? owner : external)
                     .dstQueueFamilyIndex(release ? external : owner)
                     .image(images[i]);
@@ -4036,6 +4064,10 @@ final class VkTerrainRenderer {
                     .sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO)
                     .flags(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
             check(vkBeginCommandBuffer(cmd, begin), "vkBeginCommandBuffer(translucent)");
+            // OpenGL was handed the pair at the end of the opaque pass; this
+            // pass loads the depth and samples the colour, so it takes them
+            // back first. See the four-argument transferSharedImages.
+            transferSharedImages(stack, cmd, false, true);
             if (timestampsSupported) {
                 // Reset with the other pair at the top of the opaque buffer,
                 // which is submitted to the same queue before this one, so the
@@ -4098,6 +4130,7 @@ final class VkTerrainRenderer {
                 vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                         queryPool, slot * 4 + 3);
             }
+            transferSharedImages(stack, cmd, true, true);
             check(vkEndCommandBuffer(cmd), "vkEndCommandBuffer(translucent)");
 
             VkSubmitInfo submit = VkSubmitInfo.calloc(stack)
