@@ -69,9 +69,14 @@ public abstract class TerrainDrawMixin {
                                          CallbackInfo ci) {
         if (TerrainFrame.layer((WorldRenderer) (Object) this, layer, matrices,
                 viewX, viewY, viewZ)) {
-            // Vulkan drew it. Cancelling here also skips the layer's own
-            // OpenGL state setup, which is right: nothing of vanilla's runs for
-            // this layer at all, so there is no half-applied state left behind.
+            // Vulkan drew it. The layer's state was set up two lines above
+            // this hook and cancelling skips the end of the method, where the
+            // game takes it down again — so it is taken down here. Left in
+            // place, the translucent layer's blending, the lightmap and the
+            // smooth shading stayed on for whatever the game drew next,
+            // which on this version reads its defaults rather than setting
+            // them.
+            layer.clearRenderState();
             ci.cancel();
         }
     }
