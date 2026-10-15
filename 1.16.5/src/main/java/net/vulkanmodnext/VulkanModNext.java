@@ -24,6 +24,20 @@ public class VulkanModNext {
     public static final Logger LOGGER = LogManager.getLogger("VulkanModNext");
 
     public VulkanModNext() {
+        // Client-only, said in the way Forge asks for it: without this a server
+        // that does not have the mod lists the client as incompatible, which is
+        // wrong — nothing of this mod ever talks to a server.
+        ModLoadingContext.get().registerExtensionPoint(ExtensionPoint.DISPLAYTEST,
+                () -> org.apache.commons.lang3.tuple.Pair.of(
+                        () -> net.minecraftforge.fml.network.FMLNetworkConstants.IGNORESERVERONLY,
+                        (remote, fromServer) -> true));
+        if (net.minecraftforge.fml.loading.FMLEnvironment.dist
+                != net.minecraftforge.api.distmarker.Dist.CLIENT) {
+            // Installed on a dedicated server by mistake. Everything below
+            // names client classes that do not exist there.
+            LOGGER.info("VulkanMod Next is client-only and does nothing on a server.");
+            return;
+        }
         LOGGER.info("VulkanMod 1.16.5 loaded.");
         net.vulkanmodnext.client.VulkanConfig.load(FMLPaths.CONFIGDIR.get().toFile());
         // Straight after the settings and before anything else logs: what the
