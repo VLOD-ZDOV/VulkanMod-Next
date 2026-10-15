@@ -40,6 +40,17 @@ public final class EarlySetup implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+        try {
+            String group = PatchQuarantine.groupOf(mixinClassName);
+            if (PatchQuarantine.isOff(group)) {
+                System.out.println("[VulkanModNext] Leaving out " + mixinClassName
+                        + ": its patches collided with another mod on an earlier launch.");
+                return false;
+            }
+        } catch (Throwable failure) {
+            System.out.println("[VulkanModNext] Patch check failed for " + mixinClassName
+                    + "; applying it as normal. " + failure);
+        }
         return true;
     }
 

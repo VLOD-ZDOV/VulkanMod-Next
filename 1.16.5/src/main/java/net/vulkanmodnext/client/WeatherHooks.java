@@ -75,7 +75,10 @@ public final class WeatherHooks {
      */
     static int capture(VkContext context, WorldRenderer renderer, RenderType layer,
                        MatrixStack matrices, double viewX, double viewY, double viewZ) {
-        if (!Sprites.usable(context, VulkanConfig.on("vulkanWeather"))) {
+        // Without the patch that keeps the game from drawing them again,
+        // taking them here would draw them twice; see PatchQuarantine.
+        if (!Sprites.usable(context, VulkanConfig.on("vulkanWeather"))
+                || net.vulkanmodnext.PatchQuarantine.isOff("weather")) {
             return 0;
         }
         Minecraft mc = Minecraft.getInstance();

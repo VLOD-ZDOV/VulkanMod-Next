@@ -96,7 +96,10 @@ public final class ParticleHooks {
      */
     static int capture(VkContext context, MatrixStack matrices, Matrix4f projection,
                        double viewX, double viewY, double viewZ) {
-        if (!Sprites.usable(context, VulkanConfig.on("vulkanParticles"))) {
+        // Without the patch that keeps the game from drawing them again,
+        // taking them here would draw them twice; see PatchQuarantine.
+        if (!Sprites.usable(context, VulkanConfig.on("vulkanParticles"))
+                || net.vulkanmodnext.PatchQuarantine.isOff("particles")) {
             return 0;
         }
         Minecraft mc = Minecraft.getInstance();
