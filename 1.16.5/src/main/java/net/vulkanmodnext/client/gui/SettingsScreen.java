@@ -35,6 +35,8 @@ public class SettingsScreen extends Screen {
 
     private static final int ROW_HEIGHT = 21;
     private static final int ROWS = 9;
+    /** Tooltip width in pixels; about sixty characters of the English. */
+    private static final int TOOLTIP_WIDTH = 300;
 
     private final Screen parent;
     /** Null while the presets page is showing. */
@@ -44,7 +46,7 @@ public class SettingsScreen extends Screen {
     private String lastPreset;
 
     public SettingsScreen(Screen parent) {
-        super(new StringTextComponent("VulkanMod 1.16.5"));
+        super(new StringTextComponent(Lang.tr("vulkanmodnext.ui.title", "VulkanMod 1.16.5")));
         this.parent = parent;
     }
 
@@ -72,8 +74,8 @@ public class SettingsScreen extends Screen {
         int tabWidth = 74;
         int tabsLeft = this.width / 2 - (tabWidth * 5 + 16) / 2;
         Button presetsTab = new Button(tabsLeft, 28, tabWidth, 20,
-                new StringTextComponent(category == null ? TextFormatting.WHITE + "Presets"
-                        : TextFormatting.GRAY + "Presets"),
+                new StringTextComponent((category == null ? TextFormatting.WHITE : TextFormatting.GRAY)
+                        + Lang.tr("vulkanmodnext.ui.presets", "Presets")),
                 pressed -> {
                     category = null;
                     scroll = 0;
@@ -85,7 +87,8 @@ public class SettingsScreen extends Screen {
         Settings.Category[] categories = Settings.Category.values();
         for (int i = 0; i < categories.length; i++) {
             Settings.Category tab = categories[i];
-            String name = tab.name().charAt(0) + tab.name().substring(1).toLowerCase();
+            String name = Lang.tr("vulkanmodnext.category." + tab.name().toLowerCase(java.util.Locale.ROOT),
+                    tab.name().charAt(0) + tab.name().substring(1).toLowerCase());
             Button button = new Button(tabsLeft + i * (tabWidth + 4), 28, tabWidth, 20,
                     new StringTextComponent(tab == category ? TextFormatting.WHITE + name
                             : TextFormatting.GRAY + name),
@@ -109,7 +112,7 @@ public class SettingsScreen extends Screen {
                 Presets.Preset preset = Presets.ALL[i];
                 int x = left + (i % 2) * (half + 4);
                 int y = top + (i / 2) * ROW_HEIGHT;
-                addButton(new Button(x, y, half, 20, new StringTextComponent(preset.name),
+                addButton(new Button(x, y, half, 20, new StringTextComponent(Lang.presetName(preset.name)),
                         pressed -> {
                             preset.apply();
                             lastPreset = preset.name;
@@ -134,14 +137,14 @@ public class SettingsScreen extends Screen {
         }
 
         addButton(new Button(this.width / 2 - 154, this.height - 28, 100, 20,
-                new StringTextComponent("Reset all"), pressed -> {
+                new StringTextComponent(Lang.tr("vulkanmodnext.ui.reset_all", "Reset all")), pressed -> {
                     VulkanConfig.reset();
                     rebuild();
                 }));
         addButton(new Button(this.width / 2 - 50, this.height - 28, 100, 20,
-                new StringTextComponent("Done"), pressed -> onClose()));
+                new StringTextComponent(Lang.tr("vulkanmodnext.ui.done", "Done")), pressed -> onClose()));
         addButton(new Button(this.width / 2 + 54, this.height - 28, 100, 20,
-                new StringTextComponent("Save"), pressed -> VulkanConfig.save()));
+                new StringTextComponent(Lang.tr("vulkanmodnext.ui.save", "Save")), pressed -> VulkanConfig.save()));
     }
 
     /**
@@ -227,16 +230,17 @@ public class SettingsScreen extends Screen {
             java.util.Arrays.asList("visibilitySeedCache", "cacheBlockEntityModels"));
 
     private ITextComponent label(Settings.Setting setting, int value) {
-        String shown = setting.bool ? (value != 0 ? "on" : "off") : Integer.toString(value);
+        String shown = setting.bool ? (value != 0 ? Lang.tr("vulkanmodnext.ui.on", "on")
+                : Lang.tr("vulkanmodnext.ui.off", "off")) : Integer.toString(value);
         String colour = setting.live ? TextFormatting.WHITE.toString()
                 : TextFormatting.DARK_GRAY.toString();
         String suffix = setting.live ? ""
                 : IMPOSSIBLE.contains(setting.key)
-                        ? TextFormatting.DARK_GRAY + "  (needs ray tracing, not on 1.16.5)"
+                        ? TextFormatting.DARK_GRAY + "  " + Lang.tr("vulkanmodnext.ui.impossible", "(needs ray tracing, not on 1.16.5)")
                         : NOT_NEEDED.contains(setting.key)
-                        ? TextFormatting.DARK_GRAY + "  (not needed on 1.16.5)"
-                        : TextFormatting.DARK_GRAY + "  (not yet ported)";
-        return new StringTextComponent(colour + setting.title() + ": "
+                        ? TextFormatting.DARK_GRAY + "  " + Lang.tr("vulkanmodnext.ui.not_needed", "(not needed on 1.16.5)")
+                        : TextFormatting.DARK_GRAY + "  " + Lang.tr("vulkanmodnext.ui.not_ported", "(not yet ported)");
+        return new StringTextComponent(colour + Lang.settingName(setting.key, setting.title()) + ": "
                 + (setting.live ? TextFormatting.YELLOW : TextFormatting.DARK_GRAY) + shown
                 + suffix);
     }
@@ -260,31 +264,31 @@ public class SettingsScreen extends Screen {
         // on purpose: a player should read it before they start turning things
         // on and wondering why nothing happens.
         drawCenteredString(matrices, this.font,
-                new StringTextComponent(TextFormatting.GRAY + "" + Settings.liveCount() + " of "
-                        + Settings.all().size() + " settings do something in this port so far"),
+                new StringTextComponent(TextFormatting.GRAY + Lang.tr("vulkanmodnext.ui.live_count",
+                        "%s of %s settings do something in this port so far",
+                        Settings.liveCount(), Settings.all().size())),
                 this.width / 2, 52 - 32, 0xA0A0A0);
         super.render(matrices, mouseX, mouseY, partialTicks);
 
         if (rows.size() > ROWS) {
             drawCenteredString(matrices, this.font, new StringTextComponent(
-                            TextFormatting.DARK_GRAY + "" + (scroll + 1) + "–"
-                                    + Math.min(rows.size(), scroll + ROWS) + " of " + rows.size()
-                                    + ", scroll to see the rest"),
+                            TextFormatting.DARK_GRAY + Lang.tr("vulkanmodnext.ui.scroll",
+                                    "%s–%s of %s, scroll to see the rest", scroll + 1,
+                                    Math.min(rows.size(), scroll + ROWS), rows.size())),
                     this.width / 2, this.height - 42, 0x808080);
         }
         if (category == null) {
             if (lastPreset != null) {
                 drawCenteredString(matrices, this.font, new StringTextComponent(
-                                TextFormatting.GREEN + lastPreset + " applied"),
+                                TextFormatting.GREEN + Lang.tr("vulkanmodnext.ui.applied", "%s applied",
+                                        Lang.presetName(lastPreset))),
                         this.width / 2, 58 + 4 * ROW_HEIGHT + 6, 0xFFFFFF);
             }
             Presets.Preset over = hoveredPreset(mouseX, mouseY);
             if (over != null) {
-                List<ITextComponent> lines = new java.util.ArrayList<>();
-                for (String line : wrap(over.description, 60)) {
-                    lines.add(new StringTextComponent(line));
-                }
-                renderComponentTooltip(matrices, lines, mouseX, mouseY);
+                renderTooltip(matrices, this.font.split(new StringTextComponent(
+                        Lang.presetDescription(over.name, over.description)), TOOLTIP_WIDTH),
+                        mouseX, mouseY);
             }
             return;
         }
@@ -292,20 +296,24 @@ public class SettingsScreen extends Screen {
         // because there is more of it than fits.
         Settings.Setting hovered = hovered(mouseY);
         if (hovered != null) {
-            List<ITextComponent> lines = new java.util.ArrayList<>();
-            for (String line : wrap(hovered.description, 60)) {
-                lines.add(new StringTextComponent(line));
-            }
+            String text = Lang.settingDescription(hovered.key, hovered.description);
             if (!hovered.live) {
-                lines.add(new StringTextComponent(TextFormatting.DARK_GRAY
-                        + (IMPOSSIBLE.contains(hovered.key)
-                                ? "Needs ray tracing, which the Vulkan bindings of this game "
-                                        + "version cannot reach."
-                                : NOT_NEEDED.contains(hovered.key)
-                                ? "The cost this saves on 1.12.2 does not exist on this version."
-                                : "Remembered, but nothing reads it on this version yet.")));
+                text += "\n" + TextFormatting.DARK_GRAY + (IMPOSSIBLE.contains(hovered.key)
+                        ? Lang.tr("vulkanmodnext.ui.tip_impossible", "Needs ray tracing, which "
+                                + "the Vulkan bindings of this game version cannot reach.")
+                        : NOT_NEEDED.contains(hovered.key)
+                        ? Lang.tr("vulkanmodnext.ui.tip_not_needed", "The cost this saves on "
+                                + "1.12.2 does not exist on this version.")
+                        : Lang.tr("vulkanmodnext.ui.tip_not_ported", "Remembered, but nothing "
+                                + "reads it on this version yet."));
             }
-            renderComponentTooltip(matrices, lines, mouseX, mouseY);
+            // Wrapped by the font, by width, rather than at spaces: Japanese
+            // and Chinese have none, and a translated line would not wrap.
+            java.util.List<net.minecraft.util.IReorderingProcessor> lines = new java.util.ArrayList<>();
+            for (String paragraph : text.split("\n")) {
+                lines.addAll(this.font.split(new StringTextComponent(paragraph), TOOLTIP_WIDTH));
+            }
+            renderTooltip(matrices, lines, mouseX, mouseY);
         }
     }
 
@@ -329,25 +337,6 @@ public class SettingsScreen extends Screen {
         }
         int at = index + scroll;
         return at >= 0 && at < rows.size() ? rows.get(at) : null;
-    }
-
-    private static List<String> wrap(String text, int width) {
-        List<String> out = new java.util.ArrayList<>();
-        StringBuilder line = new StringBuilder();
-        for (String word : text.split(" ")) {
-            if (line.length() > 0 && line.length() + word.length() + 1 > width) {
-                out.add(line.toString());
-                line.setLength(0);
-            }
-            if (line.length() > 0) {
-                line.append(' ');
-            }
-            line.append(word);
-        }
-        if (line.length() > 0) {
-            out.add(line.toString());
-        }
-        return out;
     }
 
     @Override

@@ -51,8 +51,8 @@ public final class UpdateNotice {
         }
         told = true;
         String page = UpdateCheck.downloadPage();
-        mc.gui.getChat().addMessage(new StringTextComponent("VulkanMod Next " + newer
-                + " is available: ")
+        mc.gui.getChat().addMessage(new StringTextComponent(net.vulkanmodnext.client.gui.Lang.tr(
+                "vulkanmodnext.ui.update_available", "VulkanMod Next %s is available: ", newer))
                 .withStyle(TextFormatting.GOLD)
                 .append(new StringTextComponent(page).withStyle(style -> style
                         .withColor(TextFormatting.AQUA)
