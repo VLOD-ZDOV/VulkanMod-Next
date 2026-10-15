@@ -2899,7 +2899,10 @@ final class VkTerrainRenderer {
     private void drawChunks(int layerOrdinal, int[] chunks, int chunkCount, float[] mvp,
                             double viewX, double viewY, double viewZ, VkChunkMirror mirror) {
         int variant = pipelineForLayer(layerOrdinal);
-        if (variant < 0) {
+        // An empty layer still arrives here, because the frame opens and
+        // closes on particular layers whatever is in them. Nothing to draw,
+        // and in the first frames of a world no geometry buffer to bind yet.
+        if (variant < 0 || chunkCount == 0 || mirror.geometryBuffer() == 0) {
             return;
         }
         float cutoff = LAYER_CUTOFF[layerOrdinal];
