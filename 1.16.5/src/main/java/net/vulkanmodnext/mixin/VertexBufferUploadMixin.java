@@ -32,14 +32,20 @@ import java.nio.ByteBuffer;
 @Mixin(VertexBuffer.class)
 public abstract class VertexBufferUploadMixin implements VertexBufferSlot {
 
+    @org.spongepowered.asm.mixin.Shadow
+    private int id;
+
     @Redirect(method = "upload_", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/client/renderer/BufferBuilder;popNextBuffer()"
                     + "Lcom/mojang/datafixers/util/Pair;"))
     private Pair<BufferBuilder.DrawState, ByteBuffer> vulkanmodnext$mirror(BufferBuilder builder) {
         Pair<BufferBuilder.DrawState, ByteBuffer> popped = builder.popNextBuffer();
         ByteBuffer data = popped.getSecond();
-        if (data != null && data.remaining() > 0
-                && ChunkLayers.isChunkBuffer((VertexBuffer) (Object) this)) {
+        // Not for a buffer already closed: the game checks its name after this
+        // call and uploads nothing, and a slot assigned here would never be
+        // given back, because close() has already run.
+        if (data != null && data.remaining() > 0 && id != -1
+                && ChunkLayers.isDrawnByVulkan((VertexBuffer) (Object) this)) {
             // Neither position nor limit is touched by the mirror, so the
             // upload on the next line still sees exactly what it expects.
             ChunkMirror.onBufferData(vulkanmodnext$slotOrAssign(), data);

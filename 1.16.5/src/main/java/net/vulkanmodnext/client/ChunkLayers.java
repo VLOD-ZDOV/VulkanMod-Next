@@ -21,7 +21,7 @@ import java.util.WeakHashMap;
  */
 public final class ChunkLayers {
 
-    private static final Map<VertexBuffer, Boolean> TRANSLUCENT =
+    private static final Map<VertexBuffer, RenderType> TRANSLUCENT =
             Collections.synchronizedMap(new WeakHashMap<>());
 
     private ChunkLayers() {
@@ -29,7 +29,7 @@ public final class ChunkLayers {
 
     public static void note(VertexBuffer buffer, RenderType layer) {
         if (buffer != null) {
-            TRANSLUCENT.put(buffer, layer == RenderType.translucent());
+            TRANSLUCENT.put(buffer, layer);
         }
     }
 
@@ -40,7 +40,21 @@ public final class ChunkLayers {
      *         every rebuild.
      */
     public static boolean isTranslucent(VertexBuffer buffer) {
-        return Boolean.TRUE.equals(TRANSLUCENT.get(buffer));
+        return TRANSLUCENT.get(buffer) == RenderType.translucent();
+    }
+
+    /**
+     * Whether Vulkan draws this buffer's layer at all.
+     *
+     * Every chunk layer but tripwire. Tripwire is drawn after translucent and
+     * stays with the game (see TerrainFrame.ordinalOf), so its geometry is
+     * neither copied nor taken out of the game's buffer: emptying it with the
+     * other layers made every tripwire in the world invisible, drawn by
+     * neither renderer.
+     */
+    public static boolean isDrawnByVulkan(VertexBuffer buffer) {
+        RenderType layer = TRANSLUCENT.get(buffer);
+        return layer != null && layer != RenderType.tripwire();
     }
 
     /**

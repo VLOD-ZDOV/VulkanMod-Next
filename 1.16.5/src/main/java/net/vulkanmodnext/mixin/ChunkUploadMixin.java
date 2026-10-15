@@ -36,7 +36,8 @@ public abstract class ChunkUploadMixin {
     @Inject(method = "uploadChunkLayer", at = @At("HEAD"))
     private void vulkanmodnext$see(BufferBuilder builder, VertexBuffer target,
                                    CallbackInfoReturnable<CompletableFuture<Void>> cir) {
-        if (target == null) {
+        if (target == null || !ChunkLayers.isDrawnByVulkan(target)) {
+            // Tripwire stays with the game; copying it would only spend a slot.
             return;
         }
         int slot = ((VertexBufferSlot) (Object) target).vulkanmodnext$slotOrAssign();
