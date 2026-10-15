@@ -48,6 +48,22 @@ public class SettingsScreen extends Screen {
         this.parent = parent;
     }
 
+    /**
+     * Lays the screen out again, starting from no widgets.
+     *
+     * Calling init() directly, as every click here did, added a fresh set of
+     * buttons on top of the old ones without removing them: the game clears
+     * the lists only in its own init(Minecraft, int, int). The old buttons
+     * stayed underneath, invisible and still taking clicks, so a click on one
+     * tab could also flip a setting from a tab shown earlier.
+     */
+    private void rebuild() {
+        this.buttons.clear();
+        this.children.clear();
+        setFocused(null);
+        init();
+    }
+
     @Override
     protected void init() {
         rows = category == null ? java.util.Collections.emptyList() : Settings.of(category);
@@ -61,7 +77,7 @@ public class SettingsScreen extends Screen {
                 pressed -> {
                     category = null;
                     scroll = 0;
-                    init();
+                    rebuild();
                 });
         presetsTab.active = category != null;
         addButton(presetsTab);
@@ -76,7 +92,7 @@ public class SettingsScreen extends Screen {
                     pressed -> {
                         category = tab;
                         scroll = 0;
-                        init();
+                        rebuild();
                     });
             button.active = tab != category;
             addButton(button);
@@ -97,7 +113,7 @@ public class SettingsScreen extends Screen {
                         pressed -> {
                             preset.apply();
                             lastPreset = preset.name;
-                            init();
+                            rebuild();
                         }));
             }
         }
@@ -113,14 +129,14 @@ public class SettingsScreen extends Screen {
             addButton(new Button(left, top + i * ROW_HEIGHT, rowWidth, 20, label(setting),
                     pressed -> {
                         step(setting, !hasShiftDown());
-                        init();
+                        rebuild();
                     }));
         }
 
         addButton(new Button(this.width / 2 - 154, this.height - 28, 100, 20,
                 new StringTextComponent("Reset all"), pressed -> {
                     VulkanConfig.reset();
-                    init();
+                    rebuild();
                 }));
         addButton(new Button(this.width / 2 - 50, this.height - 28, 100, 20,
                 new StringTextComponent("Done"), pressed -> onClose()));
@@ -231,7 +247,7 @@ public class SettingsScreen extends Screen {
         int next = Math.max(0, Math.min(most, scroll - (int) Math.signum(amount)));
         if (next != scroll) {
             scroll = next;
-            init();
+            rebuild();
         }
         return true;
     }
