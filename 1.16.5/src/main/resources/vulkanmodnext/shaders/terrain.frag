@@ -97,6 +97,11 @@ layout(set = 0, binding = 3, std140) uniform Frame {
     //     what decides how far a glint is allowed to go past white.
     // w = how brightly a leaf lets the sun through from behind. 0 off.
     vec4 world;
+    // xyz = where the eye is relative to the origin vRelative is measured
+    //       from, which is the view entity's feet rather than its eye: a
+    //       standing player's is about 1.62 up, a third-person camera's is
+    //       behind and above. w unused.
+    vec4 eye;
 } frame;
 
 layout(push_constant) uniform Draw {
@@ -582,6 +587,14 @@ const float FOLIAGE_STOPS = 0.72;
 const float CUTOUT_STOPS = 0.34;
 
 /**
+ * The instance mask a shadow ray asks for. Everything but the cross-shaped
+ * plants carries bit 1; plants carry bit 2 only (see VkRayTracing), so they
+ * cast no traced shadow. Without their texture a ray sees a tuft of grass as
+ * its whole square quad, and that square was the shadow it threw.
+ */
+const uint SHADOW_CASTERS = 0x01u;
+
+/**
  * A number that belongs to this quad and this pixel, and moves between frames.
  *
  * Per primitive, so the speckle sits on the leaf rather than swimming across
@@ -623,7 +636,7 @@ bool rayBlocked(vec3 from, vec3 direction, float start, float reach) {
     if (BLEND) {
         rayQueryInitializeEXT(query, terrainStructure,
                 gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT,
-                0xFFu, from, start, direction, reach);
+                SHADOW_CASTERS, from, start, direction, reach);
         rayQueryProceedEXT(query);
         return rayQueryGetIntersectionTypeEXT(query, true)
                 != gl_RayQueryCommittedIntersectionNoneEXT;
@@ -633,7 +646,7 @@ bool rayBlocked(vec3 from, vec3 direction, float start, float reach) {
             // ray flag it overrules what each structure says about itself, so
             // with it set the loop below could never run.
             gl_RayFlagsTerminateOnFirstHitEXT,
-            0xFFu, from, start, direction, reach);
+            SHADOW_CASTERS, from, start, direction, reach);
     // frame.world.z: one when this renderer's own colour target has room above
     // white in it, zero when it is eight bits a channel. What reads it is the
     // ceiling of the sun's highlight, which has to be two different numbers
@@ -748,7 +761,11 @@ float sunShadow(vec3 normal) {
         return 0.0;
     }
     float facing = dot(normal, frame.sun.xyz);
-    if (facing <= 0.0) {
+    // Strictly turned away. The sun runs east to west with no north or south
+    // in it, so a wall facing north or south meets it at exactly zero; "at
+    // most zero" left every such wall unshadowed, and a tree's shadow crossing
+    // the ground stopped dead where it met one.
+    if (facing < 0.0) {
         return 0.0;
     }
     // Faded in as the sun climbs, not switched on when it clears a threshold.
@@ -772,7 +789,19 @@ float sunShadow(vec3 normal) {
     // ray skimming its own surface and finding it — which reads as a crawling
     // stipple over everything flat, exactly where the shadows are longest and
     // most visible.
-    vec3 from = vRelative + normal * (0.02 + 0.14 * (1.0 - facing));
+    //
+    // It was 0.02 + 0.14 over the grazing range, and a lift that large moves
+    // the shadow itself: on the ground its edge slides towards what cast it by
+    // the lift over the tangent of the sun's height, a third of a block at a
+    // low sun, which reads as a shadow come loose from its object. Smaller,
+    // and growing with distance instead, where the precision it guards is
+    // actually lost. Plants keep the old lift: they sway, the structure holds
+    // them still, and a smaller lift starts the ray behind their own copy.
+    float lift = 0.01 + 0.0005 * vDistance + 0.06 * (1.0 - facing);
+    if (isFoliage(vMaterial & MATERIAL_MASK)) {
+        lift = max(lift, 0.02 + 0.14 * (1.0 - facing));
+    }
+    vec3 from = vRelative + normal * lift;
     // Which way to look, spread over how wide the sun is made to be.
     //
     // One ray gives one answer, so its edge is a staircase along the pixel
@@ -782,7 +811,10 @@ float sunShadow(vec3 normal) {
     // than smooth, but it costs nothing: still one ray. A second ray would
     // cost as much again as the whole effect does.
     vec3 direction = frame.sun.xyz;
-    float spread = frame.sunParams.z;
+    // Not in the water pass. The opaque frame is averaged over frames later,
+    // which is what turns this pattern into a soft edge; the translucent pass
+    // never is, so there the same pattern stays on screen as grain.
+    float spread = BLEND ? 0.0 : frame.sunParams.z;
     if (spread > 0.0) {
         vec3 tangent = normalize(cross(direction,
                 abs(direction.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
@@ -790,6 +822,13 @@ float sunShadow(vec3 normal) {
         float angle = ditherValue(gl_FragCoord.xy) * 6.2831853;
         float radius = sqrt(ditherValue(gl_FragCoord.xy + 5.588238)) * spread;
         direction = normalize(direction + (cos(angle) * tangent + sin(angle) * bitangent) * radius);
+        // Never into the surface it starts on. At a low sun the spread tips
+        // some rays below the face, and those find the face itself a block or
+        // so along: a stipple of shadow over sunlit ground.
+        float below = dot(direction, normal);
+        if (below < 0.01) {
+            direction = normalize(direction + normal * (0.01 - below));
+        }
     }
     return rayBlocked(from, direction, 0.01, reach) ? frame.sun.w * fade : 0.0;
 #else
@@ -833,7 +872,8 @@ float lightBlocked(vec3 normal, vec3 toSource, float distance) {
     // aim at a different spot on the flame for every pixel and a distant
     // shadow's border spreads while a contact shadow's stays tight.
     vec3 target = toSource;
-    float radius = frame.lightShadow.x;
+    // Held still in the water pass, for the reason sunShadow gives.
+    float radius = BLEND ? 0.0 : frame.lightShadow.x;
     if (radius > 0.0) {
         vec3 tangent = normalize(cross(direction,
                 abs(direction.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
@@ -877,8 +917,9 @@ float lightBlocked(vec3 normal, vec3 toSource, float distance) {
  * in a block model is flat, so the cross product of the two screen-space
  * derivatives is the exact face normal here, not an approximation of it.
  *
- * vRelative is the surface with the eye at the origin, so the direction back to
- * the camera is its negation. Which way the cross product points depends on the
+ * vRelative is the surface measured from the view entity's feet, and
+ * frame.eye is where the camera stands from there, so the direction back to
+ * the camera is their difference. Which way the cross product points depends on the
  * winding as it lands on screen, so the result is turned to face the camera
  * rather than trusted.
  */
@@ -924,7 +965,12 @@ vec3 faceNormal() {
     // of the surface's position, which is a clean number, where against the
     // measured normal it was a dot product of two noisy ones and could come
     // out either way exactly when the face was hardest to measure.
-    return dot(n, vRelative) > 0.0 ? -n : n;
+    // Towards the eye, not towards the origin of vRelative, which is the view
+    // entity's feet. Measured from the feet, every top face between the feet
+    // and the eye — the block beside you, a slab, a table — was turned to
+    // face down, and so was every wall between a third-person camera and the
+    // player: never shadowed, and wrong for everything else keyed off it.
+    return dot(n, vRelative - frame.eye.xyz) > 0.0 ? -n : n;
 }
 
 // Roughly half the width of a torch flame, in blocks. What it controls is how
@@ -1142,6 +1188,21 @@ float distanceOf(float depth) {
     return 2.0 * n * f / (f + n - (2.0 * depth - 1.0) * (f - n));
 }
 
+/**
+ * The opaque frame under the water, as the water pass sees it.
+ *
+ * That copy is the raw frame: its traced shadow edges and leaf dapple are
+ * dithered per pixel and only averaged later, in OpenGL, into a target this
+ * pass never reads. Refracted or reflected as it is, that dither lands on the
+ * water as grain. The sampler is linear, which softens it; four taps would
+ * cancel most of it, and are not taken, because the only build with that
+ * dither is the tracing one, whose water pipeline has no room left for three
+ * more dependent reads (see WHY_NOT_WITH_RAY_QUERY).
+ */
+vec3 sceneColorAt(vec2 uv) {
+    return textureLod(sceneColor, uv, 0.0).rgb;
+}
+
 vec4 traceReflection(vec3 origin, vec3 dir) {
     // Away from the surface before the first step, or the surface finds itself.
     float t = 0.3;
@@ -1182,18 +1243,22 @@ vec4 traceReflection(vec3 origin, vec3 dir) {
             // along the edge of the screen would announce how it was made.
             // Behind it, but by how much. A ray that is a long way past the
             // surface never touched it — it went by, somewhere out of sight.
-            if (distanceOf(onScreen.z) - distanceOf(textureLod(sceneDepth, onScreen.xy, 0.0).r)
-                    > REFLECT_THICKNESS) {
+            float behindBy = distanceOf(onScreen.z)
+                    - distanceOf(textureLod(sceneDepth, onScreen.xy, 0.0).r);
+            if (behindBy > REFLECT_THICKNESS) {
                 return vec4(0.0);
             }
+            // Let go gradually rather than at one depth, or moving waves flip
+            // neighbouring pixels between the object and the sky.
+            float thick = 1.0 - smoothstep(0.5 * REFLECT_THICKNESS, REFLECT_THICKNESS, behindBy);
             vec2 edge = smoothstep(vec2(0.0), vec2(0.14), onScreen.xy)
                       * smoothstep(vec2(0.0), vec2(0.14), vec2(1.0) - onScreen.xy);
             // And believed less the further it had to go, all the way to
             // nothing at the end of its rope.
             float reach = t / REFLECT_REACH;
             float trust = clamp(1.0 - reach * reach, 0.0, 1.0);
-            return vec4(textureLod(sceneColor, onScreen.xy, 0.0).rgb,
-                        edge.x * edge.y * trust);
+            return vec4(sceneColorAt(onScreen.xy),
+                        edge.x * edge.y * trust * thick);
         }
         lastMiss = t;
         t += step;
@@ -1436,6 +1501,14 @@ void main() {
     if (frame.water.x > 0.0 && material == MATERIAL_WATER && normal.y > 0.9) {
         vec3 still = normal;
         vec2 g = waveGradient(waveXZ(), frame.frameInfo.x);
+        // Faded out where a wave is too small on screen to be a wave. Roughly
+        // how many blocks one pixel covers on the water: distance squared over
+        // the height it is seen from, times a pixel's angle. Once the shortest
+        // wave (about five blocks) spans fewer than two or three pixels, one
+        // sample of it is aliasing, and it sparkles in the sun's path.
+        float footprint = dot(vRelative, vRelative)
+                / max(abs(vRelative.y), 0.05) * (1.0 / 800.0);
+        g *= 1.0 - smoothstep(1.0, 2.5, footprint);
         vec2 slope = g * (WAVE_SLOPE * frame.water.x);
         normal = normalize(vec3(-slope.x, 1.0, -slope.y));
         // The reflection is measured against a calmer surface than the light is,
@@ -1791,7 +1864,7 @@ void main() {
                     behindDepth = textureLod(sceneDepth, uv, 0.0).r;
 #endif
                 }
-                vec3 behind = textureLod(sceneColor, shifted, 0.0).rgb;
+                vec3 behind = sceneColorAt(shifted);
                 // The bed, banded by the surface above it.
                 //
                 // Not a second pattern: `normal` is the wave normal by this
@@ -1956,7 +2029,11 @@ void main() {
                 // single creature, so a villager standing in the shallows was
                 // being painted a third of the way towards the sand it is
                 // standing on, however far the opacity was let down for it.
-                vec3 refracted = shaded * alpha + behind * (1.0 - alpha);
+                // The water's own tint thins out over the last half block of
+                // depth, so a shore has no hard line of tint; the foam still
+                // marks it.
+                float edgeAlpha = alpha * smoothstep(0.0, 0.5, through);
+                vec3 refracted = shaded * edgeAlpha + behind * (1.0 - edgeAlpha);
                 shaded = mix(shaded, refracted, trustBehind);
                 alpha = mix(alpha, 1.0, trustBehind);
 #endif

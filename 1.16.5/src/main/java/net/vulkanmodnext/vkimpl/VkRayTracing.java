@@ -64,6 +64,9 @@ final class VkRayTracing {
         return false;
     }
 
+    void setCreatureShift(float x, float y, float z) {
+    }
+
     void setCreatureGeometry(long buffer, long byteOffset, int vertexCount) {
     }
 

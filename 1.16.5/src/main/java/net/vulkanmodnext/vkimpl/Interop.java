@@ -138,17 +138,8 @@ final class Interop {
     private static final int GENERIC_ALL = 0x10000000;
 
     /**
-     * Puts the Win32 access rights in front of an export structure, and hands
-     * back whatever should now start the chain.
-     *
-     * On anything but Windows this is the export structure unchanged, because
-     * a file descriptor carries no rights to ask for. On Windows the rights are
-     * only defaulted when the structure is missing, and a driver may default
-     * them to nothing: the handle then imports cleanly and never signals, which
-     * is indistinguishable from a hang until the card is reset.
-     */
-    /**
-     * The same rights, for an exported memory handle.
+     * The access rights of {@link #appendWin32SemaphoreRights}, for an exported
+     * memory handle.
      *
      * Separate structure, identical reasoning: without it the rights on the
      * handle are whatever the driver defaults to, and a handle imported without
@@ -169,6 +160,16 @@ final class Interop {
         return rights.address();
     }
 
+    /**
+     * Puts the Win32 access rights in front of an export structure, and hands
+     * back whatever should now start the chain.
+     *
+     * On anything but Windows this is the export structure unchanged, because
+     * a file descriptor carries no rights to ask for. On Windows the rights are
+     * only defaulted when the structure is missing, and a driver may default
+     * them to nothing: the handle then imports cleanly and never signals, which
+     * is indistinguishable from a hang until the card is reset.
+     */
     static long appendWin32SemaphoreRights(MemoryStack stack, long exportInfo) {
         if (!WINDOWS) {
             return exportInfo;
@@ -556,6 +557,12 @@ final class Interop {
             int glHandleType = D3D12_FENCE_SEMAPHORES
                     ? EXTSemaphoreWin32.GL_HANDLE_TYPE_D3D12_FENCE_EXT
                     : EXTSemaphoreWin32.GL_HANDLE_TYPE_OPAQUE_WIN32_EXT;
+            // Drained first: an error some earlier GL call left in the queue
+            // would otherwise be read below as this import being refused.
+            for (int drained = 0; drained < 32
+                    && GL11C.glGetError() != GL11C.GL_NO_ERROR; drained++) {
+                // nothing: only emptying the queue
+            }
             EXTSemaphoreWin32.glImportSemaphoreWin32HandleEXT(glSem, glHandleType, pHandle.get(0));
             // Checked here and nowhere else, because a refused import has no
             // other symptom: the semaphore object exists, the wait on it is
@@ -563,6 +570,8 @@ final class Interop {
             // startup and fall back to vanilla than to hang the card.
             int error = org.lwjgl.opengl.GL11C.glGetError();
             if (error != 0) {
+                // Refused, so nothing on the GL side holds it: ours to close.
+                closeHandle(pHandle.get(0));
                 throw new IllegalStateException("glImportSemaphoreWin32HandleEXT refused the "
                         + "exported semaphore (GL error 0x" + Integer.toHexString(error)
                         + "). Waiting on it from OpenGL would never return.");
@@ -661,10 +670,15 @@ final class Interop {
     }
 
     /**
-     * Memory handles, by the GL memory object that imported each one. Kept
-     * apart from {@link #RETAINED} because memory does not live as long as the
-     * device: the shared targets are rebuilt on every resize, and holding their
-     * handles until teardown kept every one of them alive. See the 1.12.2 twin.
+     * Memory handles, by the GL memory object that imported each one.
+     *
+     * Kept apart from {@link #RETAINED} because memory does not live as long as
+     * the device. The shared targets are rebuilt on every resize, and holding
+     * their handles until device teardown — the answer to closing them too
+     * early, which crashed one driver — meant an open NT handle to every
+     * colour, depth and translucent target the session ever made, each one
+     * keeping its full-size allocation alive after Vulkan and OpenGL had both
+     * let go of it.
      */
     private static final java.util.Map<Integer, Long> MEMORY_HANDLES = new java.util.HashMap<>();
 
@@ -683,9 +697,13 @@ final class Interop {
     }
 
     /**
-     * Closes the handle a GL memory object was imported from. Only after that
-     * object is deleted and OpenGL has finished with it (glFinish). Nothing to
-     * do off Windows: a file descriptor is consumed by its import.
+     * Closes the handle a GL memory object was imported from.
+     *
+     * Call it only after that memory object has been deleted and OpenGL has
+     * finished with everything that used it — glFinish, not glFlush. That is
+     * the late end of the window the driver may still read the handle in, and
+     * the only point where closing it neither races the driver nor leaks.
+     * Nothing to do off Windows: a file descriptor is consumed by its import.
      */
     static void releaseMemoryHandle(int memObj) {
         Long handle;
@@ -700,6 +718,8 @@ final class Interop {
     /** Closes everything {@link #retainHandle} kept. Called at device teardown. */
     static void releaseImportedHandles() {
         synchronized (MEMORY_HANDLES) {
+            // Whatever a context-less teardown could not delete, and so could
+            // not safely close, until now.
             for (Long handle : MEMORY_HANDLES.values()) {
                 closeHandle(handle.longValue());
             }

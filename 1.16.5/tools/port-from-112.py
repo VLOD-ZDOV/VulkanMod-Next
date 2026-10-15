@@ -127,7 +127,7 @@ PER_FILE["VkTerrainRenderer.java"] = [
     #
     # Listed before the descriptorCount rule below, which would otherwise
     # rewrite a line inside this block and stop it matching.
-    ("""        vkDeviceWaitIdle(device());
+    ("""        waitIdle();
         try (MemoryStack stack = stackPush()) {
             LongBuffer handle = stack.longs(structure);
             org.lwjgl.vulkan.VkWriteDescriptorSetAccelerationStructureKHR structureInfo =
