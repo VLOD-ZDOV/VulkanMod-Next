@@ -58,10 +58,10 @@ OVERRIDE_DEFAULT = {
 
 INT = re.compile(
     r'config\.getInt\(\s*"(\w+)",\s*CATEGORY_(\w+),\s*(\w+),\s*(-?\d+),\s*(-?\d+),\s*'
-    r'("(?:[^"\\]|\\.)*")', re.S)
+    r'((?:"(?:[^"\\]|\\.)*"\s*\+?\s*)+)', re.S)
 BOOL = re.compile(
     r'config\.getBoolean\(\s*"(\w+)",\s*CATEGORY_(\w+),\s*(\w+),\s*'
-    r'("(?:[^"\\]|\\.)*")', re.S)
+    r'((?:"(?:[^"\\]|\\.)*"\s*\+?\s*)+)', re.S)
 DEFAULT = re.compile(r'static final (?:int|boolean) (DEF_\w+)\s*=\s*([^;]+);')
 
 
@@ -70,10 +70,17 @@ def main():
     defaults = {name: value.strip() for name, value in DEFAULT.findall(text)}
 
     rows = []
+    def joined(literals):
+        # A description is several literals joined with +; taking only the
+        # first cut 87 of them off mid-sentence.
+        return '"' + "".join(re.findall(r'"((?:[^"\\]|\\.)*)"', literals)) + '"'
+
     for key, category, default, low, high, words in INT.findall(text):
+        words = joined(words)
         value = OVERRIDE_DEFAULT.get(key, defaults.get(default, "0"))
         rows.append((category, key, "int", value, low, high, words))
     for key, category, default, words in BOOL.findall(text):
+        words = joined(words)
         value = OVERRIDE_DEFAULT.get(key, defaults.get(default, "false"))
         rows.append((category, key, "bool", value, "0", "1", words))
 
