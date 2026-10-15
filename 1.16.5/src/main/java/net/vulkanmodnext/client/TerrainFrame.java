@@ -168,11 +168,14 @@ public final class TerrainFrame {
 
         int ordinal = ordinalOf(layer);
         boolean translucent = ordinal == 3;
-        // An empty translucent layer is not the end of it: particles, rain and
-        // creatures are drawn in that same pass, and a frame with no water in
-        // view still has to run it for them. Standing in a desert and breaking
-        // a block put the particles nowhere at all on 1.12.2 until it did.
-        if (!VulkanConfig.isTerrainEnabled() || ordinal < 0 || (count == 0 && !translucent)) {
+        // An empty layer still goes to the renderer, as on 1.12.2. The frame
+        // opens on the solid layer and is submitted and composited on the
+        // cutout one, so skipping an empty cutout layer — a cave with no
+        // torches, rails or grass in view — left a frame whose solid half had
+        // been taken from the game and never reached the screen. An empty
+        // translucent layer is needed too: particles, rain and creatures are
+        // drawn in that same pass.
+        if (!VulkanConfig.isTerrainEnabled() || ordinal < 0) {
             return false;
         }
         if (!handOverTextures(context)) {
@@ -212,7 +215,7 @@ public final class TerrainFrame {
                 WeatherHooks.settle(drawn);
             }
         }
-        if (count == 0) {
+        if (count == 0 && translucent) {
             // Only the sprites were ours. The layer itself is empty, or holds
             // chunks not mirrored yet, and the game draws whatever it has.
             return false;
@@ -271,7 +274,13 @@ public final class TerrainFrame {
             fog[1] = colour.get(1);
             fog[2] = colour.get(2);
             int mode = GL11C.glGetInteger(GL11.GL_FOG_MODE);
-            fog[3] = mode == GL11.GL_LINEAR ? 1.0f : 0.0f;
+            // The same codes as 1.12.2. Under water and in lava this version
+            // uses exponential fog, and mapping only the linear mode sent those
+            // as "no fog": the terrain drawn by Vulkan stood clear under water
+            // while everything the game drew was fogged.
+            fog[3] = mode == GL11.GL_LINEAR ? 1.0f
+                    : mode == GL11.GL_EXP ? 2.0f
+                    : mode == GL11.GL_EXP2 ? 3.0f : 0.0f;
             fog[4] = GL11C.glGetFloat(GL11.GL_FOG_START);
             fog[5] = GL11C.glGetFloat(GL11.GL_FOG_END);
             fog[6] = GL11C.glGetFloat(GL11.GL_FOG_DENSITY);
@@ -512,10 +521,12 @@ public final class TerrainFrame {
         broken = true;
         if (droppingVanillaBuffers) {
             VulkanModNext.LOGGER.warn("The Vulkan terrain {}; filling the game's own chunk "
-                    + "buffers again", why);
-            // Settled now rather than at the top of the next frame, so that
-            // this frame's remaining layers are the only ones drawn empty.
-            updateVanillaBufferDrop();
+                    + "buffers again from the next frame", why);
+            // Not settled here. This runs inside the game's renderChunkLayer,
+            // and the rebuild it would start closes every chunk buffer while
+            // that method is still walking them and about to draw from them.
+            // The top of the next frame does it (beginFrame); this frame's
+            // remaining layers draw empty, which is one frame of holes.
         }
     }
 
