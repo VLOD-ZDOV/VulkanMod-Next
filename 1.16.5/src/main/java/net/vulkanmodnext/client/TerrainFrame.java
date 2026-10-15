@@ -126,7 +126,15 @@ public final class TerrainFrame {
         int at = 0;
         int empty = 0;
         int unmirrored = 0;
-        for (int i = 0; i < visible.size() && count < MAX_CHUNKS; i++) {
+        // Translucent from the far end, the order the game itself draws it in:
+        // nothing in that pass writes depth, so a near pane drawn before the
+        // water behind it is drawn over by that water. On 1.12.2 the list
+        // arrives already reversed by the game; here it is read before the
+        // game walks it, so the reversal is ours to do.
+        boolean backToFront = layer == RenderType.translucent();
+        int size = visible.size();
+        for (int n = 0; n < size && count < MAX_CHUNKS; n++) {
+            int i = backToFront ? size - 1 - n : n;
             Object entry = visible.get(i);
             net.minecraft.client.renderer.chunk.ChunkRenderDispatcher.ChunkRender chunk =
                     ((ChunkRenderAccess) entry).vulkanmodnext$chunk();
@@ -441,6 +449,11 @@ public final class TerrainFrame {
         } catch (Throwable notYet) {
             return 0;
         }
+    }
+
+    /** The block atlas was rebuilt in place; send it, and its sprites, again. */
+    public static void atlasReloaded() {
+        sentAtlas = -1;
     }
 
     /** Kept from the top of the frame; every layer of it uses the same one. */
