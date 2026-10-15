@@ -3,33 +3,30 @@ package net.vulkanmodnext.client;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.vertex.VertexBuffer;
 
-import java.util.Collections;
-import java.util.Map;
-import java.util.WeakHashMap;
 
 /**
  * Which layer a chunk buffer belongs to.
  *
- * <p>A map rather than a field on the buffer because it is asked rarely — once
- * per chunk buffer, ever — and answered often enough not to matter. Weak keys:
- * a chunk buffer that the game has dropped must not be kept alive by our
- * bookkeeping, and there are hundreds of thousands of them over a session.
- *
- * <p>The answer is a boolean rather than the layer itself, because that is the
- * whole of what the mirror does with it: the translucent layer is sorted, the
- * other four are not.
+ * <p>Kept as a field on the buffer itself (see VertexBufferMixin). It used to
+ * be a synchronised weak map on the belief that it was written once per
+ * buffer; it is written on every getBuffer, which the terrain walk calls for
+ * every visible chunk and layer each frame.
  */
 public final class ChunkLayers {
 
-    private static final Map<VertexBuffer, RenderType> TRANSLUCENT =
-            Collections.synchronizedMap(new WeakHashMap<>());
+    private static RenderType layerOf(VertexBuffer buffer) {
+        return buffer == null ? null : ((VertexBufferSlot) (Object) buffer).vulkanmodnext$layer();
+    }
 
     private ChunkLayers() {
     }
 
     public static void note(VertexBuffer buffer, RenderType layer) {
-        if (buffer != null) {
-            TRANSLUCENT.put(buffer, layer);
+        // Asked on every getBuffer — every visible chunk, every layer, every
+        // frame — so this is a field on the buffer, written once, rather than
+        // the synchronised map it used to be.
+        if (buffer != null && layerOf(buffer) == null) {
+            ((VertexBufferSlot) (Object) buffer).vulkanmodnext$layer(layer);
         }
     }
 
@@ -40,7 +37,7 @@ public final class ChunkLayers {
      *         every rebuild.
      */
     public static boolean isTranslucent(VertexBuffer buffer) {
-        return TRANSLUCENT.get(buffer) == RenderType.translucent();
+        return layerOf(buffer) == RenderType.translucent();
     }
 
     /**
@@ -53,7 +50,7 @@ public final class ChunkLayers {
      * neither renderer.
      */
     public static boolean isDrawnByVulkan(VertexBuffer buffer) {
-        RenderType layer = TRANSLUCENT.get(buffer);
+        RenderType layer = layerOf(buffer);
         return layer != null && layer != RenderType.tripwire();
     }
 
@@ -74,9 +71,9 @@ public final class ChunkLayers {
      * supposed to occupy, and the picture lost half its colours. Nothing threw.
      *
      * <p>A chunk buffer is one the game asked for by layer, which is exactly
-     * what this map records — so the answer is already here.
+     * what this field records — so the answer is already here.
      */
     public static boolean isChunkBuffer(VertexBuffer buffer) {
-        return TRANSLUCENT.containsKey(buffer);
+        return layerOf(buffer) != null;
     }
 }

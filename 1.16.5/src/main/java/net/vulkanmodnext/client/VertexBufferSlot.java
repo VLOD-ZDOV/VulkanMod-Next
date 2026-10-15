@@ -21,4 +21,9 @@ public interface VertexBufferSlot {
      * take a slot each for the same buffer and leak one of them.
      */
     int vulkanmodnext$slotOrAssign();
+
+    /** The chunk layer this buffer holds, or null when it is not a chunk's. */
+    net.minecraft.client.renderer.RenderType vulkanmodnext$layer();
+
+    void vulkanmodnext$layer(net.minecraft.client.renderer.RenderType layer);
 }

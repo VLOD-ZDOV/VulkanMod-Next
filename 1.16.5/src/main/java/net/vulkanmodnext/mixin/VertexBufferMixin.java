@@ -33,6 +33,20 @@ public abstract class VertexBufferMixin implements VertexBufferSlot {
     @Unique
     private volatile int vulkanmodnext$slot = ChunkSlots.UNASSIGNED;
 
+    /** Written once, when the chunk first asks for this buffer by layer. */
+    @Unique
+    private volatile net.minecraft.client.renderer.RenderType vulkanmodnext$layer;
+
+    @Override
+    public net.minecraft.client.renderer.RenderType vulkanmodnext$layer() {
+        return vulkanmodnext$layer;
+    }
+
+    @Override
+    public void vulkanmodnext$layer(net.minecraft.client.renderer.RenderType layer) {
+        vulkanmodnext$layer = layer;
+    }
+
     @Override
     public int vulkanmodnext$slot() {
         return vulkanmodnext$slot;
