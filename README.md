@@ -180,6 +180,25 @@ This is not a drop-in OptiFine replacement, and it is not finished.
 
 ---
 
+## The game stopped after adding another mod
+
+Some mods change the same parts of the game this one does. When that happens, this mod turns
+off its own part that collides and keeps the rest.
+
+- **Start the game a second time.** On 1.16.5 the first launch usually keeps going without the
+  colliding part. If it stops instead, the part is now written down and the second launch
+  starts without it. On 1.12.2 the first launch stops and the second one starts without it.
+- **What was turned off stays off** until you delete the file below. On 1.16.5 a new version
+  of this mod also clears it by itself and tries again.
+  - 1.16.5: `config/vulkanmodnext-patches.properties`
+  - 1.12.2: `config/vulkanmodnext-patches.cfg`, or **Settings → Advanced → Diagnostics →
+    Class Patches** in the game
+- **If the colliding part is the renderer itself**, the mod stands aside completely and the
+  game draws the way it does without it. It is still installed and does nothing until the
+  file is deleted.
+- Either way, the log says which part and why. Please report it with `logs/latest.log` and
+  that file, so the collision can be fixed rather than only avoided.
+
 ## Something looks wrong
 
 **Send one file: `logs/latest.log`.** Play for about a minute with the world visible first;
@@ -233,9 +252,8 @@ What it cannot do: **ray tracing**, nor the settings built on it. The Vulkan bin
 version of the game ships are older than ray tracing in Vulkan, and they are the ones the game
 loads. The menu says "not on 1.16.5" rather than "not yet".
 
-What is worse than on 1.12.2: a mod whose patches collide with this one's stops the game at
-startup. The 1.12.2 build switches the colliding part off and carries on; this one does not
-yet. If that happens to you, the log names the patch — please report it.
+A part of it that collides with another mod is switched off rather than stopping the game;
+see [The game stopped after adding another mod](#the-game-stopped-after-adding-another-mod).
 
 Two things about it are better than the 1.12.2 build, and both come from the version rather
 than from us: the game is on LWJGL 3 already, so the whole two-class-loader construction is

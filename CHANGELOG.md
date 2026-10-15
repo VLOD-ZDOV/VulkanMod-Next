@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+### 1.16.5
+
+- **Fixed: the world could vanish where no grass, torches, rails or other cut-out
+  blocks were in view**, such as a bare cave. The frame was only finished on that
+  layer, so without it the terrain never reached the screen.
+- **Fixed: a mod that collides with this one no longer stops every launch.** The
+  colliding part is switched off and recorded, usually without stopping the game
+  at all; a new version of this mod tries it again by itself. See the README.
+- **Fixed: servers without this mod listed the client as incompatible**, and
+  installing it on a server by mistake crashed the server.
+- **Fixed: the settings screen kept invisible buttons from earlier clicks**, so one
+  click could also change a setting from another tab.
+- **Fixed:** tripwire invisible with the default settings; no fog under water or
+  in lava; water and glass layered in the wrong order; the old textures kept
+  after switching resource packs; 87 setting descriptions cut off mid-sentence.
+- **The renderer and its shaders brought up to the 1.12.2 build's**, which the
+  copy had fallen behind.
+- **The menu can be translated**, and is, into the same seven languages as 1.12.2.
+
+### 1.12.2
+
+- **The seven menu translations are complete again**, with the newest settings,
+  presets and the Class Patches screen.
+
+
 ## [0.10.0-alpha.8]
 
 Fixes from an outside review of the whole code base. Each claim in it was
