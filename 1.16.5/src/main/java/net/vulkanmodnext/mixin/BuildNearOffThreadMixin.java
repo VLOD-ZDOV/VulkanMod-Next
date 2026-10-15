@@ -36,9 +36,9 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 public abstract class BuildNearOffThreadMixin {
 
     // remap = false on the target: ForgeConfigSpec is Forge's own class and has
-    // no obfuscated name to look up; the method names around it do. require = 2
+    // no obfuscated name to look up; the method names around it do. Both sites are expected
     // because one landing and one missing is the failure described above.
-    @Redirect(method = {"setupRender", "compileChunksUntil"}, require = 2,
+    @Redirect(method = {"setupRender", "compileChunksUntil"},
             at = @At(value = "INVOKE", remap = false,
                     target = "Lnet/minecraftforge/common/ForgeConfigSpec$BooleanValue;"
                             + "get()Ljava/lang/Object;"))

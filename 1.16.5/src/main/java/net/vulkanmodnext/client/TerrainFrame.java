@@ -175,7 +175,8 @@ public final class TerrainFrame {
         // been taken from the game and never reached the screen. An empty
         // translucent layer is needed too: particles, rain and creatures are
         // drawn in that same pass.
-        if (!VulkanConfig.isTerrainEnabled() || ordinal < 0) {
+        if (!VulkanConfig.isTerrainEnabled() || ordinal < 0
+                || net.vulkanmodnext.PatchQuarantine.coreMissedThisLaunch()) {
             return false;
         }
         if (!handOverTextures(context)) {
@@ -493,6 +494,7 @@ public final class TerrainFrame {
         VkContext context = VulkanStartup.context();
         boolean want = VulkanConfig.on("dropVanillaBuffers")
                 && !broken
+                && !net.vulkanmodnext.PatchQuarantine.coreMissedThisLaunch()
                 && VulkanConfig.isTerrainEnabled()
                 && context != null
                 // Water and glass live in the game's buffers and nowhere else

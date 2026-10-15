@@ -71,5 +71,6 @@ public final class EarlySetup implements IMixinConfigPlugin {
     @Override
     public void postApply(String targetClassName, ClassNode targetClass, String mixinClassName,
                           IMixinInfo mixinInfo) {
+        PatchQuarantine.checkApplied(targetClass, mixinInfo);
     }
 }
