@@ -1450,6 +1450,21 @@ final class VkChunkMirror {
             pendingCopyCount = 0;
         }
         if (stagingBuffer != 0) {
+            // Close the builders' region and let any copy already under way
+            // finish before the memory it is writing into is unmapped, the
+            // same as when the ring grows. Each is a memcpy, so this is short.
+            synchronized (workerLock) {
+                workerRegionSize = 0;
+                staged.clear();
+            }
+            while (true) {
+                synchronized (workerLock) {
+                    if (workerInFlight == 0) {
+                        break;
+                    }
+                }
+                Thread.yield();
+            }
             vkUnmapMemory(device(), stagingMemory);
             vkDestroyBuffer(device(), stagingBuffer, null);
             vkFreeMemory(device(), stagingMemory, null);
