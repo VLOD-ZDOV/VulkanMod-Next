@@ -4122,12 +4122,14 @@ final class VkTerrainRenderer {
 
             VkSubmitInfo submit = VkSubmitInfo.callocStack(stack)
                     .sType(VK_STRUCTURE_TYPE_SUBMIT_INFO)
-                    .pCommandBuffers(stack.pointers(cmd))
-                    .waitSemaphoreCount(1)
-                    .pWaitSemaphores(stack.longs(vkTranslucentWaitSemaphore))
-                    .pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT))
-                    .pSignalSemaphores(stack.longs(vkTranslucentSignalSemaphore));
-            translucentSignalFenceValue++;
+                    .pCommandBuffers(stack.pointers(cmd));
+            if (SHARED_SEMAPHORES) {
+                submit.waitSemaphoreCount(1)
+                        .pWaitSemaphores(stack.longs(vkTranslucentWaitSemaphore))
+                        .pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT))
+                        .pSignalSemaphores(stack.longs(vkTranslucentSignalSemaphore));
+                translucentSignalFenceValue++;
+            }
             // Reset immediately before the submission that signals it, with
             // nothing that can throw in between. beginFrame waits on this fence
             // as well as the opaque one; a fence reset and then abandoned by an
@@ -4136,6 +4138,9 @@ final class VkTerrainRenderer {
             check(vkResetFences(device(), translucentFences[slot]), "vkResetFences(translucent)");
             check(vkQueueSubmit(ctx.getGraphicsQueue(), submit, translucentFences[slot]),
                     "vkQueueSubmit(translucent)");
+            if (!SHARED_SEMAPHORES && !cardStoppedAnswering) {
+                vkQueueWaitIdle(ctx.getGraphicsQueue());
+            }
         }
         compositeTranslucent();
         return true;
@@ -4178,6 +4183,10 @@ final class VkTerrainRenderer {
 
     /** Tells the Vulkan side the game has finished writing depth for this frame. */
     private void signalTranslucentDepth() {
+        if (!SHARED_SEMAPHORES) {
+            GL11C.glFinish();
+            return;
+        }
         try (MemoryStack stack = push()) {
             IntBuffer noBuffers = stack.mallocInt(0);
             IntBuffer textures = stack.ints(glDepthTexture);
@@ -4263,11 +4272,13 @@ final class VkTerrainRenderer {
     /** Blends the translucent target over the game's frame. */
     private void compositeTranslucent() {
         try (MemoryStack stack = push()) {
-            IntBuffer noBuffers = stack.mallocInt(0);
-            IntBuffer textures = stack.ints(glTranslucentTexture);
-            IntBuffer layouts = stack.ints(EXTSemaphore.GL_LAYOUT_SHADER_READ_ONLY_EXT);
-            setFenceValue(glTranslucentWaitSemaphore, translucentSignalFenceValue);
-            EXTSemaphore.glWaitSemaphoreEXT(glTranslucentWaitSemaphore, noBuffers, textures, layouts);
+            if (SHARED_SEMAPHORES) {
+                IntBuffer noBuffers = stack.mallocInt(0);
+                IntBuffer textures = stack.ints(glTranslucentTexture);
+                IntBuffer layouts = stack.ints(EXTSemaphore.GL_LAYOUT_SHADER_READ_ONLY_EXT);
+                setFenceValue(glTranslucentWaitSemaphore, translucentSignalFenceValue);
+                EXTSemaphore.glWaitSemaphoreEXT(glTranslucentWaitSemaphore, noBuffers, textures, layouts);
+            }
 
             int prevProgram = GL11C.glGetInteger(GL20C.GL_CURRENT_PROGRAM);
             int prevActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
@@ -7671,33 +7682,35 @@ final class VkTerrainRenderer {
                 translucentFences[i] = pFence.get(0);
             }
 
-            VkExportSemaphoreCreateInfo export = VkExportSemaphoreCreateInfo.callocStack(stack)
-                    .sType(VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO)
-                    .handleTypes(Interop.semaphoreHandleType());
-            // Windows hands out a handle with access rights attached, and the
-            // rights are only defaulted when this structure is absent — which
-            // a driver is free to read as "none". A handle like that imports
-            // without complaint and then never becomes signalled, so the wait
-            // on the OpenGL side never returns and the card is reset out from
-            // under the process. Asking for full access costs nothing and is
-            // what the specification expects for an exported Win32 handle.
-            long exportChain = Interop.appendWin32SemaphoreRights(stack, export.address());
-            VkSemaphoreCreateInfo semInfo = VkSemaphoreCreateInfo.callocStack(stack)
-                    .sType(VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO)
-                    .pNext(exportChain);
-            LongBuffer pSem = stack.mallocLong(1);
-            check(vkCreateSemaphore(device(), semInfo, null, pSem), "vkCreateSemaphore");
-            vkSignalSemaphore = pSem.get(0);
-            check(vkCreateSemaphore(device(), semInfo, null, pSem), "vkCreateSemaphore");
-            vkWaitSemaphore = pSem.get(0);
-            glWaitSemaphore = importSemaphore(stack, vkSignalSemaphore);
-            glSignalSemaphore = importSemaphore(stack, vkWaitSemaphore);
-            check(vkCreateSemaphore(device(), semInfo, null, pSem), "vkCreateSemaphore(translucent)");
-            vkTranslucentSignalSemaphore = pSem.get(0);
-            check(vkCreateSemaphore(device(), semInfo, null, pSem), "vkCreateSemaphore(translucent)");
-            vkTranslucentWaitSemaphore = pSem.get(0);
-            glTranslucentWaitSemaphore = importSemaphore(stack, vkTranslucentSignalSemaphore);
-            glTranslucentSignalSemaphore = importSemaphore(stack, vkTranslucentWaitSemaphore);
+            if (SHARED_SEMAPHORES) {
+                VkExportSemaphoreCreateInfo export = VkExportSemaphoreCreateInfo.callocStack(stack)
+                        .sType(VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO)
+                        .handleTypes(Interop.semaphoreHandleType());
+                // Windows hands out a handle with access rights attached, and the
+                // rights are only defaulted when this structure is absent — which
+                // a driver is free to read as "none". A handle like that imports
+                // without complaint and then never becomes signalled, so the wait
+                // on the OpenGL side never returns and the card is reset out from
+                // under the process. Asking for full access costs nothing and is
+                // what the specification expects for an exported Win32 handle.
+                long exportChain = Interop.appendWin32SemaphoreRights(stack, export.address());
+                VkSemaphoreCreateInfo semInfo = VkSemaphoreCreateInfo.callocStack(stack)
+                        .sType(VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO)
+                        .pNext(exportChain);
+                LongBuffer pSem = stack.mallocLong(1);
+                check(vkCreateSemaphore(device(), semInfo, null, pSem), "vkCreateSemaphore");
+                vkSignalSemaphore = pSem.get(0);
+                check(vkCreateSemaphore(device(), semInfo, null, pSem), "vkCreateSemaphore");
+                vkWaitSemaphore = pSem.get(0);
+                glWaitSemaphore = importSemaphore(stack, vkSignalSemaphore);
+                glSignalSemaphore = importSemaphore(stack, vkWaitSemaphore);
+                check(vkCreateSemaphore(device(), semInfo, null, pSem), "vkCreateSemaphore(translucent)");
+                vkTranslucentSignalSemaphore = pSem.get(0);
+                check(vkCreateSemaphore(device(), semInfo, null, pSem), "vkCreateSemaphore(translucent)");
+                vkTranslucentWaitSemaphore = pSem.get(0);
+                glTranslucentWaitSemaphore = importSemaphore(stack, vkTranslucentSignalSemaphore);
+                glTranslucentSignalSemaphore = importSemaphore(stack, vkTranslucentWaitSemaphore);
+            }
 
             createDescriptorInfrastructure(stack);
             createDrawBatches(stack);
@@ -11194,8 +11207,14 @@ final class VkTerrainRenderer {
         vkDestroyDescriptorSetLayout(device(), descriptorSetLayout, null);
         vkDestroySampler(device(), atlasSampler, null);
         vkDestroySampler(device(), lightmapSampler, null);
-        vkDestroySemaphore(device(), vkSignalSemaphore, null);
-        vkDestroySemaphore(device(), vkWaitSemaphore, null);
+        if (vkSignalSemaphore != 0) {
+            vkDestroySemaphore(device(), vkSignalSemaphore, null);
+            vkSignalSemaphore = 0;
+        }
+        if (vkWaitSemaphore != 0) {
+            vkDestroySemaphore(device(), vkWaitSemaphore, null);
+            vkWaitSemaphore = 0;
+        }
         if (vkTranslucentSignalSemaphore != 0) {
             vkDestroySemaphore(device(), vkTranslucentSignalSemaphore, null);
             vkDestroySemaphore(device(), vkTranslucentWaitSemaphore, null);
